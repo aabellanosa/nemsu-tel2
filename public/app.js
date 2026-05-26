@@ -36,13 +36,13 @@ const state = {
     { number: "405", type: "STD", status: "occupied", guest: "Emily Tan" }
   ],
   guests: [
-    { name: "Daniel Reyes", room: "305", depart: "May 29", balance: "$286.50" },
-    { name: "Linda Park", room: "303", depart: "May 28", balance: "$74.00" },
-    { name: "Ramon Cruz", room: "401", depart: "May 30", balance: "$0.00" }
+    { name: "Daniel Reyes", room: "305", depart: "May 29", balance: 16500 },
+    { name: "Linda Park", room: "303", depart: "May 28", balance: 4250 },
+    { name: "Ramon Cruz", room: "401", depart: "May 30", balance: 0 }
   ],
   activity: [
     { title: "Room 204 marked dirty", text: "Housekeeping queue updated - 8:16 AM" },
-    { title: "Advance deposit posted", text: "GH-28491 - $220.00 - 7:48 AM" },
+    { title: "Advance deposit posted", text: "GH-28491 - ₱12,500.00 - 7:48 AM" },
     { title: "VIP arrival flagged", text: "Maria Velasco requested late checkout" }
   ]
 };
@@ -68,6 +68,13 @@ document.querySelector("#businessDate").textContent = today.toLocaleDateString("
   day: "numeric",
   year: "numeric"
 });
+
+function formatPeso(amount) {
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP"
+  }).format(amount);
+}
 
 function renderMetrics() {
   const occupied = state.rooms.filter((room) => room.status === "occupied").length;
@@ -126,7 +133,7 @@ function renderGuests() {
         <p>Room ${guest.room} | Departure ${guest.depart}</p>
       </div>
       <div class="folio">
-        <strong>${guest.balance}</strong>
+        <strong>${formatPeso(guest.balance)}</strong>
         <button class="text-button" data-folio="${guest.name}">View Folio</button>
       </div>
     </div>
@@ -252,7 +259,7 @@ function renderHousekeepingWorkspace() {
 }
 
 function renderCashieringWorkspace() {
-  const unsettled = state.guests.filter((guest) => guest.balance !== "$0.00");
+  const unsettled = state.guests.filter((guest) => guest.balance !== 0);
   elements.moduleWorkspace.innerHTML = `
     <article class="panel module-banner">
       <div><p class="eyebrow">Cashiering</p><h3>Guest Folios and Settlement</h3></div>
@@ -271,8 +278,8 @@ function renderCashieringWorkspace() {
           <tbody>
             ${state.guests.map((guest, index) => `
               <tr>
-                <td>${guest.name}</td><td>${guest.room}</td><td>${guest.depart}</td><td>${guest.balance}</td>
-                <td>${guest.balance === "$0.00" ? '<span class="tag ready">Settled</span>' : `<button class="row-action" data-settle-folio="${index}">Settle Folio</button>`}</td>
+                <td>${guest.name}</td><td>${guest.room}</td><td>${guest.depart}</td><td>${formatPeso(guest.balance)}</td>
+                <td>${guest.balance === 0 ? '<span class="tag ready">Settled</span>' : `<button class="row-action" data-settle-folio="${index}">Settle Folio</button>`}</td>
               </tr>
             `).join("")}
           </tbody>
@@ -360,7 +367,7 @@ function handleArrivalAction(id) {
     room.status = "occupied";
     room.guest = arrival.guest;
   }
-  state.guests.unshift({ name: arrival.guest, room: arrival.room, depart: "May 29", balance: "$0.00" });
+  state.guests.unshift({ name: arrival.guest, room: arrival.room, depart: "May 29", balance: 0 });
   state.arrivals = state.arrivals.filter((item) => item.id !== arrival.id);
   addActivity(`${arrival.guest} checked in`, `Room ${arrival.room} - keys encoded`);
   renderAll();
@@ -486,7 +493,7 @@ elements.moduleWorkspace.addEventListener("click", (event) => {
   }
   if (event.target.dataset.settleFolio) {
     const guest = state.guests[Number(event.target.dataset.settleFolio)];
-    guest.balance = "$0.00";
+    guest.balance = 0;
     addActivity("Folio settled", `${guest.name} - Room ${guest.room}`);
     renderAll();
     notify(`${guest.name}'s folio has been settled.`);
