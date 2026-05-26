@@ -30,9 +30,10 @@ The existing navy and gold screen remains usable before Tailwind is built. Tailw
 ## Included Core UI
 
 - Front desk dashboard and operating metrics
-- Arrival filtering, room assignment, and check-in flow
-- Room rack with housekeeping/status updates
-- In-house guest folio launcher feedback
+- Functional module navigation for Reservations, Room Rack, Housekeeping, Cashiering, and Reports
+- Arrival filtering, reserved room assignment, and check-in flow
+- Room rack with housekeeping/status updates and assigned-inventory tracking
+- In-house guest folio settlement demo
 - Reservation creation modal
 - Guest/confirmation/room quick lookup
 - Shift activity feed

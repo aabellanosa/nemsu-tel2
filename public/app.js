@@ -2,12 +2,14 @@ const today = new Date();
 const dateKey = today.toISOString().split("T")[0];
 const statusLabels = {
   available: "Vacant Clean",
+  reserved: "Assigned",
   occupied: "Occupied",
   dirty: "Vacant Dirty",
   out: "Out of Order"
 };
 
 const state = {
+  activeView: "dashboard",
   arrivalFilter: "all",
   activeRoom: null,
   arrivals: [
@@ -28,7 +30,7 @@ const state = {
     { number: "304", type: "STE", status: "out" },
     { number: "305", type: "STD", status: "available" },
     { number: "401", type: "DLX", status: "occupied", guest: "Ramon Cruz" },
-    { number: "402", type: "STE", status: "available" },
+    { number: "402", type: "STE", status: "reserved", guest: "Alicia Fernandez" },
     { number: "403", type: "DLX", status: "dirty" },
     { number: "404", type: "STE", status: "available" },
     { number: "405", type: "STD", status: "occupied", guest: "Emily Tan" }
@@ -53,7 +55,11 @@ const elements = {
   activityFeed: document.querySelector("#activityFeed"),
   toast: document.querySelector("#toast"),
   reservationModal: document.querySelector("#reservationModal"),
-  roomModal: document.querySelector("#roomModal")
+  roomModal: document.querySelector("#roomModal"),
+  dashboardWorkspace: document.querySelector("#dashboardWorkspace"),
+  moduleWorkspace: document.querySelector("#moduleWorkspace"),
+  newReservationButton: document.querySelector("#newReservationButton"),
+  assignRoomButton: document.querySelector("#assignRoomButton")
 };
 
 document.querySelector("#businessDate").textContent = today.toLocaleDateString("en-US", {
@@ -136,6 +142,181 @@ function renderActivity() {
   `).join("");
 }
 
+function statusTag(status) {
+  return `<span class="tag ${status === "available" ? "ready" : "pending"}">${statusLabels[status]}</span>`;
+}
+
+function moduleStats(cards) {
+  return `
+    <div class="module-cards">
+      ${cards.map((card) => `
+        <article class="panel module-stat">
+          <p>${card.label}</p>
+          <strong>${card.value}</strong>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderReservationsWorkspace() {
+  const assigned = state.arrivals.filter((arrival) => arrival.room !== "Unassigned").length;
+  elements.moduleWorkspace.innerHTML = `
+    <article class="panel module-banner">
+      <div><p class="eyebrow">Booking Control</p><h3>Today's Reservations</h3></div>
+      <p>Manage arrival assignments and complete front-desk check-in.</p>
+    </article>
+    ${moduleStats([
+      { label: "Arrivals Today", value: state.arrivals.length },
+      { label: "Rooms Assigned", value: assigned },
+      { label: "Awaiting Room", value: state.arrivals.length - assigned }
+    ])}
+    <article class="panel workspace-panel">
+      <div class="panel-heading"><div><p class="eyebrow">Reservations</p><h3>Arrival List</h3></div></div>
+      <div class="workspace-table">
+        <table>
+          <thead><tr><th>Guest</th><th>Confirmation</th><th>ETA</th><th>Room</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            ${state.arrivals.map((arrival) => `
+              <tr>
+                <td>${arrival.guest}${arrival.vip ? '<span class="tag vip">VIP</span>' : ""}</td>
+                <td>${arrival.confirmation}</td>
+                <td>${arrival.eta}</td>
+                <td>${arrival.room}</td>
+                <td><span class="tag ${arrival.status}">${arrival.status === "ready" ? "Ready" : "Pending"}</span></td>
+                <td><button class="row-action" data-module-arrival="${arrival.id}">${arrival.room === "Unassigned" ? "Assign Room" : "Check In"}</button></td>
+              </tr>
+            `).join("") || '<tr><td colspan="6">All expected guests are checked in.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  `;
+}
+
+function renderRoomsWorkspace() {
+  const available = state.rooms.filter((room) => room.status === "available").length;
+  const occupied = state.rooms.filter((room) => room.status === "occupied").length;
+  const reserved = state.rooms.filter((room) => room.status === "reserved").length;
+  elements.moduleWorkspace.innerHTML = `
+    <article class="panel module-banner">
+      <div><p class="eyebrow">Inventory Control</p><h3>Room Rack and Availability</h3></div>
+      <p>Select a room to edit its live operating status.</p>
+    </article>
+    ${moduleStats([
+      { label: "Vacant Clean", value: available },
+      { label: "Occupied", value: occupied },
+      { label: "Assigned", value: reserved }
+    ])}
+    <article class="panel workspace-panel">
+      <div class="panel-heading"><div><p class="eyebrow">Room Inventory</p><h3>All Floors</h3></div></div>
+      <div class="status-board">
+        ${state.rooms.map((room) => `
+          <div class="status-row">
+            <div><strong>Room ${room.number}</strong><p>${room.type}${room.guest ? ` | ${room.guest}` : ""}</p></div>
+            <div class="status-row-actions">${statusTag(room.status)}<button class="row-action" data-open-room="${room.number}">Update</button></div>
+          </div>
+        `).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function renderHousekeepingWorkspace() {
+  const serviceRooms = state.rooms.filter((room) => room.status === "dirty" || room.status === "out");
+  elements.moduleWorkspace.innerHTML = `
+    <article class="panel module-banner">
+      <div><p class="eyebrow">Housekeeping</p><h3>Room Service Queue</h3></div>
+      <p>Clear dirty rooms as attendants complete inspection.</p>
+    </article>
+    ${moduleStats([
+      { label: "Vacant Dirty", value: state.rooms.filter((room) => room.status === "dirty").length },
+      { label: "Out Of Order", value: state.rooms.filter((room) => room.status === "out").length },
+      { label: "Ready Rooms", value: state.rooms.filter((room) => room.status === "available").length }
+    ])}
+    <article class="panel workspace-panel">
+      <div class="panel-heading"><div><p class="eyebrow">Work Queue</p><h3>Rooms Requiring Attention</h3></div></div>
+      <div class="status-board">
+        ${serviceRooms.map((room) => `
+          <div class="status-row">
+            <div><strong>Room ${room.number}</strong><p>${room.type} | ${statusLabels[room.status]}</p></div>
+            <div class="status-row-actions">
+              ${statusTag(room.status)}
+              ${room.status === "dirty" ? `<button class="row-action" data-clean-room="${room.number}">Mark Clean</button>` : `<button class="row-action" data-open-room="${room.number}">Review</button>`}
+            </div>
+          </div>
+        `).join("") || '<p>There are no rooms awaiting housekeeping action.</p>'}
+      </div>
+    </article>
+  `;
+}
+
+function renderCashieringWorkspace() {
+  const unsettled = state.guests.filter((guest) => guest.balance !== "$0.00");
+  elements.moduleWorkspace.innerHTML = `
+    <article class="panel module-banner">
+      <div><p class="eyebrow">Cashiering</p><h3>Guest Folios and Settlement</h3></div>
+      <p>Review current balances and record settlement activity.</p>
+    </article>
+    ${moduleStats([
+      { label: "Open Folios", value: state.guests.length },
+      { label: "Due For Payment", value: unsettled.length },
+      { label: "Settled", value: state.guests.length - unsettled.length }
+    ])}
+    <article class="panel workspace-panel">
+      <div class="panel-heading"><div><p class="eyebrow">In House Accounts</p><h3>Open Folios</h3></div></div>
+      <div class="workspace-table">
+        <table>
+          <thead><tr><th>Guest</th><th>Room</th><th>Departure</th><th>Balance</th><th></th></tr></thead>
+          <tbody>
+            ${state.guests.map((guest, index) => `
+              <tr>
+                <td>${guest.name}</td><td>${guest.room}</td><td>${guest.depart}</td><td>${guest.balance}</td>
+                <td>${guest.balance === "$0.00" ? '<span class="tag ready">Settled</span>' : `<button class="row-action" data-settle-folio="${index}">Settle Folio</button>`}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  `;
+}
+
+function renderReportsWorkspace() {
+  elements.moduleWorkspace.innerHTML = `
+    <article class="panel module-banner">
+      <div><p class="eyebrow">Reports</p><h3>Operational Report Center</h3></div>
+      <p>Prepared for the current business date and active shift.</p>
+    </article>
+    ${moduleStats([
+      { label: "Occupancy", value: `${Math.round((state.rooms.filter((room) => room.status === "occupied").length / state.rooms.length) * 100)}%` },
+      { label: "Arrival Records", value: state.arrivals.length },
+      { label: "Shift Entries", value: state.activity.length }
+    ])}
+    <article class="panel workspace-panel">
+      <div class="panel-heading"><div><p class="eyebrow">Available Reports</p><h3>Daily Operations</h3></div></div>
+      <div class="report-grid">
+        <div class="report-tile"><strong>Arrival Forecast</strong><p>Expected guests, VIP flags, and assigned rooms.</p><button class="text-button" data-report="Arrival Forecast">Generate Report</button></div>
+        <div class="report-tile"><strong>Room Status Summary</strong><p>Clean, occupied, dirty, and unavailable inventory.</p><button class="text-button" data-report="Room Status Summary">Generate Report</button></div>
+        <div class="report-tile"><strong>Cashier Balance</strong><p>In-house folios and unsettled account totals.</p><button class="text-button" data-report="Cashier Balance">Generate Report</button></div>
+        <div class="report-tile"><strong>Shift Activity Log</strong><p>Operational actions recorded during this shift.</p><button class="text-button" data-report="Shift Activity Log">Generate Report</button></div>
+      </div>
+    </article>
+  `;
+}
+
+function renderModuleWorkspace() {
+  if (state.activeView === "dashboard") return;
+  const renderers = {
+    reservations: renderReservationsWorkspace,
+    rooms: renderRoomsWorkspace,
+    housekeeping: renderHousekeepingWorkspace,
+    cashiering: renderCashieringWorkspace,
+    reports: renderReportsWorkspace
+  };
+  renderers[state.activeView]();
+}
+
 function addActivity(title, text) {
   state.activity.unshift({ title, text });
   state.activity = state.activity.slice(0, 4);
@@ -158,6 +339,8 @@ function assignAvailableRoom(arrival) {
   }
   arrival.room = room.number;
   arrival.status = "ready";
+  room.status = "reserved";
+  room.guest = arrival.guest;
   addActivity(`Room ${room.number} assigned`, `${arrival.guest} - ${arrival.confirmation}`);
   return true;
 }
@@ -203,6 +386,7 @@ function renderAll() {
   renderRooms();
   renderGuests();
   renderActivity();
+  renderModuleWorkspace();
 }
 
 document.querySelector("#newReservationButton").addEventListener("click", () => {
@@ -286,6 +470,32 @@ document.querySelector("#inHouseGuests").addEventListener("click", (event) => {
   }
 });
 
+elements.moduleWorkspace.addEventListener("click", (event) => {
+  if (event.target.dataset.moduleArrival) {
+    handleArrivalAction(event.target.dataset.moduleArrival);
+  }
+  if (event.target.dataset.openRoom) {
+    openRoom(event.target.dataset.openRoom);
+  }
+  if (event.target.dataset.cleanRoom) {
+    const room = state.rooms.find((item) => item.number === event.target.dataset.cleanRoom);
+    room.status = "available";
+    addActivity(`Room ${room.number} inspected`, "Housekeeping marked room vacant clean");
+    renderAll();
+    notify(`Room ${room.number} is now ready for assignment.`);
+  }
+  if (event.target.dataset.settleFolio) {
+    const guest = state.guests[Number(event.target.dataset.settleFolio)];
+    guest.balance = "$0.00";
+    addActivity("Folio settled", `${guest.name} - Room ${guest.room}`);
+    renderAll();
+    notify(`${guest.name}'s folio has been settled.`);
+  }
+  if (event.target.dataset.report) {
+    notify(`${event.target.dataset.report} generated for review.`);
+  }
+});
+
 document.querySelector("#globalSearch").addEventListener("input", (event) => {
   const query = event.target.value.trim().toLowerCase();
   const feedback = document.querySelector("#searchFeedback");
@@ -311,8 +521,14 @@ document.querySelector("#navigation").addEventListener("click", (event) => {
     cashiering: "Cashiering and Folios",
     reports: "Operational Reports"
   };
+  state.activeView = selected.dataset.view;
   document.querySelector("#viewTitle").textContent = labels[selected.dataset.view];
-  notify(`${selected.textContent.trim()} workspace selected.`);
+  const showingDashboard = state.activeView === "dashboard";
+  elements.dashboardWorkspace.classList.toggle("hidden", !showingDashboard);
+  elements.moduleWorkspace.classList.toggle("hidden", showingDashboard);
+  elements.newReservationButton.classList.toggle("hidden", !["dashboard", "reservations"].includes(state.activeView));
+  elements.assignRoomButton.classList.toggle("hidden", !["dashboard", "reservations"].includes(state.activeView));
+  renderModuleWorkspace();
 });
 
 renderAll();

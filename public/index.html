@@ -10,7 +10,7 @@
   <body>
     <header class="topbar">
       <div class="brand">
-        <div class="brand-mark">NTH</div>
+        <div class="brand-mark">NH</div>
         <div>
           <p class="eyebrow">Nemsu-Tagbina Hotel</p>
           <h1>Front Desk Console</h1>
@@ -58,10 +58,11 @@
           </div>
         </section>
 
-        <section class="metrics" id="metrics" aria-label="Key occupancy metrics"></section>
+        <div id="dashboardWorkspace">
+          <section class="metrics" id="metrics" aria-label="Key occupancy metrics"></section>
 
-        <section class="operations-grid">
-          <article class="panel large" id="arrivalPanel">
+          <section class="operations-grid">
+            <article class="panel large" id="arrivalPanel">
             <div class="panel-heading">
               <div>
                 <p class="eyebrow">Arrivals</p>
@@ -88,9 +89,9 @@
                 <tbody id="arrivalsTable"></tbody>
               </table>
             </div>
-          </article>
+            </article>
 
-          <article class="panel room-rack">
+            <article class="panel room-rack">
             <div class="panel-heading">
               <div>
                 <p class="eyebrow">Inventory</p>
@@ -100,14 +101,15 @@
             </div>
             <div class="rack-legend">
               <span><i class="available"></i> Vacant Clean</span>
+              <span><i class="reserved"></i> Assigned</span>
               <span><i class="occupied"></i> Occupied</span>
               <span><i class="dirty"></i> Dirty</span>
               <span><i class="out"></i> Out of Order</span>
             </div>
             <div class="rooms" id="roomRack"></div>
-          </article>
+            </article>
 
-          <article class="panel in-house">
+            <article class="panel in-house">
             <div class="panel-heading">
               <div>
                 <p class="eyebrow">In House</p>
@@ -116,9 +118,9 @@
               <span class="counter" id="inHouseCount"></span>
             </div>
             <div id="inHouseGuests" class="guest-list"></div>
-          </article>
+            </article>
 
-          <article class="panel activity">
+            <article class="panel activity">
             <div class="panel-heading">
               <div>
                 <p class="eyebrow">Activity</p>
@@ -126,8 +128,11 @@
               </div>
             </div>
             <div id="activityFeed" class="activity-feed"></div>
-          </article>
-        </section>
+            </article>
+          </section>
+        </div>
+
+        <section id="moduleWorkspace" class="module-workspace hidden" aria-live="polite"></section>
       </main>
     </div>
 
@@ -180,6 +185,7 @@
         <label class="status-select">Update room status
           <select id="roomStatusSelect">
             <option value="available">Vacant Clean</option>
+            <option value="reserved">Assigned</option>
             <option value="occupied">Occupied</option>
             <option value="dirty">Vacant Dirty</option>
             <option value="out">Out of Order</option>
