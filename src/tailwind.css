@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Customize the property theme here. Existing screen styles use these
+ * variables, and Tailwind colors in tailwind.config.js point to them too.
+ */
+@layer base {
+  :root {
+    --navy: #102a43;
+    --navy-deep: #091c2c;
+    --navy-soft: #1e4667;
+    --gold: #c7963e;
+    --gold-light: #f6e8c9;
+    --canvas: #f3f4f2;
+    --panel: #ffffff;
+    --line: #e3e5e5;
+    --ink: #172b3d;
+    --muted: #6c7a86;
+    --green: #267d59;
+    --green-bg: #e6f4ed;
+    --red: #bc4b4b;
+    --red-bg: #fae9e9;
+    --amber: #b97819;
+    --amber-bg: #fff1d9;
+    --shadow: 0 5px 22px rgba(16, 42, 67, 0.06);
+  }
+}
+
+/*
+ * Component utilities override the original CSS after a Tailwind build.
+ * New screens can use either these established classes or regular utilities.
+ */
+@layer components {
+  .primary-button {
+    @apply inline-flex items-center justify-center rounded-sm border border-[#aa7a27] bg-brand-gold px-[22px] text-[13px] font-semibold text-white transition-colors hover:bg-[#b88630];
+  }
+
+  .secondary-button {
+    @apply inline-flex items-center justify-center rounded-sm border border-[#ced4d8] bg-white px-[22px] text-[13px] font-semibold text-brand-navy transition-colors hover:bg-slate-50;
+  }
+
+  .panel {
+    @apply border border-line bg-panel shadow-panel;
+  }
+
+  .tag.ready {
+    @apply bg-[#e6f4ed] text-success;
+  }
+
+  .tag.pending {
+    @apply bg-[#fff1d9] text-warning;
+  }
+
+  .tag.vip {
+    @apply bg-brand-gold-light text-[#916318];
+  }
+
+  .nav-item.active {
+    @apply bg-brand-soft text-white;
+  }
+}

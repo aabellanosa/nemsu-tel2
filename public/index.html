@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Front Desk Console | Grand Harbor Hotel</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="tailwind.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">NTH</div>
+        <div>
+          <p class="eyebrow">Nemsu-Tagbina Hotel</p>
+          <h1>Front Desk Console</h1>
+        </div>
+      </div>
+      <div class="property-meta">
+        <div><span>Business Date</span><strong id="businessDate"></strong></div>
+        <div><span>Shift</span><strong>Morning / A. Santos</strong></div>
+        <button class="icon-button" aria-label="Notifications">3</button>
+      </div>
+    </header>
+
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Main navigation">
+        <nav id="navigation">
+          <button class="nav-item active" data-view="dashboard"><span>01</span> Front Desk</button>
+          <button class="nav-item" data-view="reservations"><span>02</span> Reservations</button>
+          <button class="nav-item" data-view="rooms"><span>03</span> Room Rack</button>
+          <button class="nav-item" data-view="housekeeping"><span>04</span> Housekeeping</button>
+          <button class="nav-item" data-view="cashiering"><span>05</span> Cashiering</button>
+          <button class="nav-item" data-view="reports"><span>06</span> Reports</button>
+        </nav>
+        <section class="sidebar-card">
+          <p class="eyebrow">Quick Find</p>
+          <label for="globalSearch">Guest / Room / Confirmation</label>
+          <input id="globalSearch" type="search" placeholder="Search records...">
+          <p class="muted" id="searchFeedback">Ready for lookup</p>
+        </section>
+        <section class="night-audit">
+          <p class="eyebrow">Night Audit</p>
+          <strong>Pending Review</strong>
+          <p>2 open folios require settlement before rollover.</p>
+        </section>
+      </aside>
+
+      <main class="main-content">
+        <section class="hero-panel">
+          <div>
+            <p class="eyebrow">Property Operations</p>
+            <h2 id="viewTitle">Today's Front Desk Overview</h2>
+          </div>
+          <div class="actions">
+            <button class="secondary-button" id="assignRoomButton">Assign Room</button>
+            <button class="primary-button" id="newReservationButton">New Reservation</button>
+          </div>
+        </section>
+
+        <section class="metrics" id="metrics" aria-label="Key occupancy metrics"></section>
+
+        <section class="operations-grid">
+          <article class="panel large" id="arrivalPanel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Arrivals</p>
+                <h3>Expected Today</h3>
+              </div>
+              <div class="tabs" id="arrivalTabs">
+                <button class="active" data-filter="all">All</button>
+                <button data-filter="vip">VIP</button>
+                <button data-filter="unassigned">Unassigned</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Guest</th>
+                    <th>Confirmation</th>
+                    <th>ETA</th>
+                    <th>Room</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="arrivalsTable"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel room-rack">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Inventory</p>
+                <h3>Room Rack</h3>
+              </div>
+              <button class="text-button" id="showAllRooms">All Rooms</button>
+            </div>
+            <div class="rack-legend">
+              <span><i class="available"></i> Vacant Clean</span>
+              <span><i class="occupied"></i> Occupied</span>
+              <span><i class="dirty"></i> Dirty</span>
+              <span><i class="out"></i> Out of Order</span>
+            </div>
+            <div class="rooms" id="roomRack"></div>
+          </article>
+
+          <article class="panel in-house">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">In House</p>
+                <h3>Guest Services</h3>
+              </div>
+              <span class="counter" id="inHouseCount"></span>
+            </div>
+            <div id="inHouseGuests" class="guest-list"></div>
+          </article>
+
+          <article class="panel activity">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Activity</p>
+                <h3>Shift Log</h3>
+              </div>
+            </div>
+            <div id="activityFeed" class="activity-feed"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="reservationModal" class="modal">
+      <form id="reservationForm" method="dialog">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Reservation</p>
+            <h2>Create Booking</h2>
+          </div>
+          <button class="close-button" type="button" data-close="reservationModal" aria-label="Close">&times;</button>
+        </div>
+        <div class="form-grid">
+          <label>Guest name<input name="guestName" required placeholder="Full name"></label>
+          <label>Arrival date<input name="arrivalDate" type="date" required></label>
+          <label>Nights<input name="nights" type="number" required min="1" value="1"></label>
+          <label>Room type
+            <select name="roomType">
+              <option>Deluxe King</option>
+              <option>Deluxe Twin</option>
+              <option>Executive Suite</option>
+              <option>Standard Queen</option>
+            </select>
+          </label>
+          <label>ETA<input name="eta" type="time" value="14:00"></label>
+          <label>VIP Status
+            <select name="vip">
+              <option value="false">Standard</option>
+              <option value="true">VIP</option>
+            </select>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" data-close="reservationModal">Cancel</button>
+          <button class="primary-button" type="submit">Save Reservation</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="roomModal" class="modal compact">
+      <form method="dialog" id="roomForm">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Room Profile</p>
+            <h2 id="roomModalTitle">Room</h2>
+          </div>
+          <button class="close-button" type="button" data-close="roomModal" aria-label="Close">&times;</button>
+        </div>
+        <div id="roomDetails"></div>
+        <label class="status-select">Update room status
+          <select id="roomStatusSelect">
+            <option value="available">Vacant Clean</option>
+            <option value="occupied">Occupied</option>
+            <option value="dirty">Vacant Dirty</option>
+            <option value="out">Out of Order</option>
+          </select>
+        </label>
+        <div class="modal-actions">
+          <button class="primary-button" type="submit">Update Status</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
