@@ -18,7 +18,14 @@
       </div>
       <div class="property-meta">
         <div><span>Business Date</span><strong id="businessDate"></strong></div>
-        <div><span>Shift</span><strong>Morning / A. Santos</strong></div>
+        <div><span>Shift</span><strong id="activeShift">Morning</strong></div>
+        <div class="operator-badge">
+          <span>Signed In</span>
+          <strong id="activeOperator">A. Santos</strong>
+          <small id="activeRole">Front Desk Agent</small>
+        </div>
+        <button class="header-button" id="changeShiftButton">Change Shift</button>
+        <button class="header-button subtle" id="signOutButton">Sign Out</button>
         <button class="icon-button" aria-label="Notifications">3</button>
       </div>
     </header>
@@ -29,9 +36,10 @@
           <button class="nav-item active" data-view="dashboard"><span>01</span> Front Desk</button>
           <button class="nav-item" data-view="reservations"><span>02</span> Reservations</button>
           <button class="nav-item" data-view="rooms"><span>03</span> Room Rack</button>
-          <button class="nav-item" data-view="housekeeping"><span>04</span> Housekeeping</button>
-          <button class="nav-item" data-view="cashiering"><span>05</span> Cashiering</button>
-          <button class="nav-item" data-view="reports"><span>06</span> Reports</button>
+          <button class="nav-item" data-view="departures"><span>04</span> Departures</button>
+          <button class="nav-item" data-view="housekeeping"><span>05</span> Housekeeping</button>
+          <button class="nav-item" data-view="cashiering"><span>06</span> Cashiering</button>
+          <button class="nav-item" data-view="reports"><span>07</span> Reports</button>
         </nav>
         <section class="sidebar-card">
           <p class="eyebrow">Quick Find</p>
@@ -100,7 +108,7 @@
               <button class="text-button" id="showAllRooms">All Rooms</button>
             </div>
             <div class="rack-legend">
-              <span><i class="available"></i> Vacant Clean</span>
+              <span><i class="available"></i> Ready</span>
               <span><i class="reserved"></i> Assigned</span>
               <span><i class="occupied"></i> Occupied</span>
               <span><i class="dirty"></i> Dirty</span>
@@ -148,7 +156,7 @@
         <div class="form-grid">
           <label>Guest name<input name="guestName" required placeholder="Full name"></label>
           <label>Arrival date<input name="arrivalDate" type="date" required></label>
-          <label>Nights<input name="nights" type="number" required min="1" value="1"></label>
+          <label>Departure date<input name="departureDate" type="date" required></label>
           <label>Room type
             <select name="roomType">
               <option>Deluxe King</option>
@@ -158,6 +166,27 @@
             </select>
           </label>
           <label>ETA<input name="eta" type="time" value="14:00"></label>
+          <label>Adults<input name="adults" type="number" min="1" value="1" required></label>
+          <label>Children<input name="children" type="number" min="0" value="0" required></label>
+          <label>Rate plan
+            <select name="ratePlan">
+              <option value="BAR">Best Available Rate</option>
+              <option value="CORP">Corporate Rate</option>
+              <option value="GOV">Government Rate</option>
+              <option value="PKG">Package Rate</option>
+            </select>
+          </label>
+          <label>Nightly rate (PHP)<input name="nightlyRate" type="number" min="0" value="4250" required></label>
+          <label>Payment guarantee
+            <select name="paymentMethod">
+              <option>Credit Card Guarantee</option>
+              <option>Cash Deposit</option>
+              <option>Direct Bill</option>
+              <option>Pay at Hotel</option>
+            </select>
+          </label>
+          <label>Contact number<input name="phone" type="tel" placeholder="+63 9xx xxx xxxx"></label>
+          <label>Email<input name="email" type="email" placeholder="guest@example.com"></label>
           <label>VIP Status
             <select name="vip">
               <option value="false">Standard</option>
@@ -165,6 +194,9 @@
             </select>
           </label>
         </div>
+        <label class="handover-notes">Reservation notes
+          <textarea name="notes" rows="2" placeholder="Preferences, arrival notes, special requests..."></textarea>
+        </label>
         <div class="modal-actions">
           <button class="secondary-button" type="button" data-close="reservationModal">Cancel</button>
           <button class="primary-button" type="submit">Save Reservation</button>
@@ -182,17 +214,168 @@
           <button class="close-button" type="button" data-close="roomModal" aria-label="Close">&times;</button>
         </div>
         <div id="roomDetails"></div>
-        <label class="status-select">Update room status
-          <select id="roomStatusSelect">
-            <option value="available">Vacant Clean</option>
-            <option value="reserved">Assigned</option>
-            <option value="occupied">Occupied</option>
-            <option value="dirty">Vacant Dirty</option>
-            <option value="out">Out of Order</option>
-          </select>
-        </label>
+        <div class="form-grid room-state-form">
+          <label>Front office status
+            <select id="roomOccupancySelect">
+              <option value="vacant">Vacant</option>
+              <option value="assigned">Assigned</option>
+              <option value="occupied">Occupied</option>
+            </select>
+          </label>
+          <label>Housekeeping status
+            <select id="roomHousekeepingSelect">
+              <option value="clean">Clean</option>
+              <option value="dirty">Dirty</option>
+              <option value="inspected">Inspected</option>
+              <option value="pickup">Pickup</option>
+            </select>
+          </label>
+          <label>Maintenance status
+            <select id="roomMaintenanceSelect">
+              <option value="inService">In Service</option>
+              <option value="outOfService">Out of Service</option>
+              <option value="outOfOrder">Out of Order</option>
+            </select>
+          </label>
+        </div>
         <div class="modal-actions">
-          <button class="primary-button" type="submit">Update Status</button>
+          <button class="primary-button" id="updateRoomStatusButton" type="submit">Update Operations Status</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="reservationDetailModal" class="modal">
+      <form method="dialog">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Reservation Presentation</p>
+            <h2 id="reservationDetailTitle">Reservation</h2>
+          </div>
+          <button class="close-button" type="button" data-close="reservationDetailModal" aria-label="Close">&times;</button>
+        </div>
+        <div id="reservationDetailContent" class="reservation-detail"></div>
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" data-close="reservationDetailModal">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="checkInModal" class="modal">
+      <form id="checkInForm">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Arrival Processing</p>
+            <h2>Review and Check In</h2>
+          </div>
+          <button class="close-button" type="button" data-close="checkInModal" aria-label="Close">&times;</button>
+        </div>
+        <div id="checkInOverview" class="handover-summary"></div>
+        <div class="form-grid">
+          <label>Payment method
+            <select id="checkInPaymentMethod" required>
+              <option>Credit Card Guarantee</option>
+              <option>Cash Deposit</option>
+              <option>Direct Bill</option>
+              <option>Pay at Hotel</option>
+            </select>
+          </label>
+          <label>Room keys issued<input id="checkInKeys" type="number" min="1" value="2" required></label>
+        </div>
+        <label class="checkbox-row"><input id="checkInIdentity" type="checkbox" required> Guest identity / registration details reviewed.</label>
+        <label class="checkbox-row"><input id="checkInRoomReady" type="checkbox" required> Room and payment guarantee confirmed for check-in.</label>
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" data-close="checkInModal">Cancel</button>
+          <button class="primary-button" type="submit">Complete Check-In</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="folioModal" class="modal">
+      <form method="dialog">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Guest Account</p>
+            <h2 id="folioModalTitle">Folio Ledger</h2>
+          </div>
+          <button class="close-button" type="button" data-close="folioModal" aria-label="Close">&times;</button>
+        </div>
+        <div id="folioLedger" class="workspace-table ledger"></div>
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" data-close="folioModal">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="handoverModal" class="modal">
+      <form id="handoverForm">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Shift Control</p>
+            <h2>Complete Handover</h2>
+          </div>
+          <button class="close-button" type="button" data-close="handoverModal" aria-label="Close">&times;</button>
+        </div>
+        <div class="handover-summary" id="handoverSummary"></div>
+        <div class="form-grid">
+          <label>Incoming employee
+            <select name="incomingUser" required>
+              <option value="Maria Dela Cruz|Front Desk Agent">Maria Dela Cruz</option>
+              <option value="J. Lim|Front Desk Supervisor">J. Lim</option>
+              <option value="Carla Mendoza|Cashier">Carla Mendoza</option>
+              <option value="Rosa Villarin|Housekeeping Supervisor">Rosa Villarin</option>
+              <option value="N. Garcia|Night Auditor">N. Garcia</option>
+            </select>
+          </label>
+          <label>Incoming shift
+            <select name="incomingShift" required>
+              <option>Afternoon</option>
+              <option>Evening</option>
+              <option>Night Audit</option>
+              <option>Morning</option>
+            </select>
+          </label>
+        </div>
+        <label class="handover-notes">Handover notes
+          <textarea name="notes" rows="3" placeholder="Pending arrivals, folios requiring review, room issues..."></textarea>
+        </label>
+        <label class="checkbox-row"><input name="verified" type="checkbox" required> Pending work and cashier responsibilities have been reviewed.</label>
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" data-close="handoverModal">Cancel</button>
+          <button class="primary-button" type="submit">Transfer Shift</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="loginModal" class="modal login-modal">
+      <form id="loginForm">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Secure Access</p>
+            <h2>Start Operator Session</h2>
+          </div>
+        </div>
+        <p class="login-intro">Select a demo operator to enter the workspace. Available modules reflect that employee's role.</p>
+        <div class="form-grid">
+          <label>Employee
+            <select name="loginUser" required>
+              <option value="A. Santos|Front Desk Agent">A. Santos - Front Desk Agent</option>
+              <option value="J. Lim|Front Desk Supervisor">J. Lim - Front Desk Supervisor</option>
+              <option value="Carla Mendoza|Cashier">Carla Mendoza - Cashier</option>
+              <option value="Rosa Villarin|Housekeeping Supervisor">Rosa Villarin - Housekeeping Supervisor</option>
+              <option value="N. Garcia|Night Auditor">N. Garcia - Night Auditor</option>
+            </select>
+          </label>
+          <label>Shift
+            <select name="loginShift" required>
+              <option>Morning</option>
+              <option>Afternoon</option>
+              <option>Evening</option>
+              <option>Night Audit</option>
+            </select>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="primary-button" type="submit">Sign In</button>
         </div>
       </form>
     </dialog>

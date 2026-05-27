@@ -2,6 +2,10 @@
 
 A Micros-Fidelio-inspired hotel property management UI prototype built with a dependency-free Node.js static server and browser-side demo state.
 
+## Functional Documentation
+
+- [User Access and UI Flow](docs/USER_ACCESS_AND_UI_FLOW.md) defines roles, allowed tabs, operational permissions, reservation/check-in/cashiering/departure flow, shift handover, and the planned persistence boundary.
+
 ## Run
 
 ```powershell
@@ -31,11 +35,26 @@ The existing navy and gold screen remains usable before Tailwind is built. Tailw
 
 - Front desk dashboard and operating metrics
 - Functional module navigation for Reservations, Room Rack, Housekeeping, Cashiering, and Reports
-- Arrival filtering, reserved room assignment, and check-in flow
-- Room rack with housekeeping/status updates and assigned-inventory tracking
-- In-house guest folio settlement demo
-- Reservation creation modal
+- Departures and check-out workspace with outstanding-balance protection
+- Demo operator sign-in, sign-out, and shift handover workflow
+- Role-aware navigation for front desk, supervisor, cashier, housekeeping, and night audit users
+- Operator and shift attribution on operational activity entries
+- Arrival filtering, room-type-aware assignment, and guided check-in review flow
+- Separate front-office occupancy, housekeeping, and maintenance room statuses
+- In-house folio ledger with charge/payment postings and calculated balances
+- Expanded reservation capture and presentation for stay dates, occupants, rates, guarantee, contact, and notes
 - Guest/confirmation/room quick lookup
 - Shift activity feed
 
-This first iteration is front-end functionality only. Data resets when the page reloads.
+This first iteration is front-end functionality only. Reservation, room, folio, user-session, and handover data reset when the page reloads. The session workflow is intended to establish the permission and audit model before adding SQLite persistence.
+
+## Persistence-Ready Concepts
+
+The current browser state is organized around concepts intended to become SQLite entities:
+
+- Reservations retain lifecycle status, dates, requested/assigned rooms, rate and guarantee information.
+- Rooms retain separate occupancy, housekeeping, and maintenance states.
+- In-house stays reference reservations and hold append-style folio transaction ledgers.
+- Shift activity entries retain operator attribution.
+
+Role controls remain UI-level demonstrations until a server API enforces authorization.
