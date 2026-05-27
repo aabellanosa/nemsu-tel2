@@ -205,6 +205,11 @@
   - Nightly rate, rate plan, and payment guarantee.
   - Reservation status.
 - `Details` presents the complete captured reservation information.
+- `Print Confirmation` produces a printable reservation confirmation containing:
+  - Guest and confirmation details.
+  - Stay dates, room type, and assigned room where available.
+  - Occupancy, rate plan, nightly rate, and estimated accommodation total.
+  - Guarantee method, contact information, VIP indicator, and notes.
 
 ### Assign Room
 
@@ -267,6 +272,10 @@
   - Reference number.
   - Amount.
   - Calculated balance due.
+- `Print Folio` produces a guest-facing printable folio containing:
+  - Guest, room, departure date, and settlement status.
+  - All current session ledger postings.
+  - Calculated Philippine Peso balance due.
 
 ### Post Payment
 
@@ -364,7 +373,14 @@
   - Room State Summary.
   - Cashier Ledger.
   - Departure List.
-- Current UI confirms report request only; it does not yet generate persisted output files.
+- Selecting a report opens a print-formatted browser document and invokes the browser print dialog.
+- Printable reports contain only records available in the current browser session:
+  - Arrival Forecast lists current active reservations and room assignment status.
+  - Room State Summary lists occupancy, housekeeping, and maintenance status by room.
+  - Cashier Ledger summarizes open in-house folios and outstanding balance totals.
+  - Departure List identifies in-house guests, balances, and readiness for check-out.
+- Printing actions are reflected in the current shift activity log.
+- The UI does not yet save report copies, assign official report numbers, or archive printed output.
 - Production reporting should be based on:
   - Business date.
   - Persisted reservations and stays.
@@ -400,7 +416,7 @@
 - Permissions are enforced in the UI only; a production API must enforce authorization.
 - Folio workflow presently supports sample charges and settlement payments only.
 - No cancellation, no-show, room move, upgrade, deposit processing, adjustment, refund, group block, or night-audit rollover workflow is included yet.
-- Reports provide interface feedback only and are not generated or archived.
+- Printable reports and folios are created from browser-session data only and are not generated from persisted records or archived.
 
 ## Recommended SQLite Transition Scope
 

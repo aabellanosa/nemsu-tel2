@@ -44,6 +44,8 @@ const state = {
   arrivalFilter: "all",
   activeRoom: null,
   activeReservationId: null,
+  printableReservationId: null,
+  printableStayId: null,
   handovers: [],
   reservations: [
     {
@@ -438,6 +440,7 @@ function assignAvailableRoom(reservation) {
 
 function openReservationDetail(id) {
   const reservation = state.reservations.find((item) => item.id === Number(id));
+  state.printableReservationId = reservation.id;
   document.querySelector("#reservationDetailTitle").textContent = `${reservation.guest} | ${reservation.confirmation}`;
   document.querySelector("#reservationDetailContent").innerHTML = `
     <div class="detail-cell"><span>Status</span>${reservation.status.toUpperCase()}</div>
@@ -522,6 +525,7 @@ function openRoom(number) {
 
 function openFolio(stayId) {
   const stay = state.stays.find((item) => item.id === Number(stayId));
+  state.printableStayId = stay.id;
   document.querySelector("#folioModalTitle").textContent = `${stay.guest} | Room ${stay.room}`;
   document.querySelector("#folioLedger").innerHTML = `
     <table><thead><tr><th>Type</th><th>Description</th><th>Reference</th><th>Amount</th></tr></thead>
@@ -530,9 +534,150 @@ function openFolio(stayId) {
   elements.folioModal.showModal();
 }
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[character]));
+}
+
+function printTable(headers, rows) {
+  return `
+    <table>
+      <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}</tbody>
+    </table>`;
+}
+
+function openPrintDocument(title, subtitle, body) {
+  const printWindow = window.open("", "_blank", "width=960,height=720");
+  if (!printWindow) {
+    notify("Enable pop-ups to print documents.");
+    return;
+  }
+  printWindow.document.write(`<!doctype html>
+    <html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 34px; color: #172b3d; font-family: Arial, sans-serif; font-size: 12px; }
+      .header { display: flex; justify-content: space-between; padding-bottom: 18px; border-bottom: 2px solid #102a43; }
+      .hotel { font-family: Georgia, serif; font-size: 23px; color: #102a43; }
+      .header p, .meta p { margin: 5px 0 0; color: #5c6c79; }
+      .meta { text-align: right; }
+      h1 { margin: 26px 0 5px; font-family: Georgia, serif; font-size: 22px; font-weight: normal; }
+      .subtitle { margin-bottom: 23px; color: #5c6c79; }
+      .details { display: grid; grid-template-columns: repeat(2, 1fr); border: 1px solid #dbe1e4; margin: 18px 0 24px; }
+      .detail { padding: 11px 13px; border-bottom: 1px solid #e9edef; }
+      .detail:nth-child(odd) { border-right: 1px solid #e9edef; }
+      .detail span { display: block; margin-bottom: 4px; font-size: 10px; font-weight: bold; color: #657682; text-transform: uppercase; }
+      table { width: 100%; border-collapse: collapse; margin: 18px 0; }
+      th { border-bottom: 2px solid #102a43; padding: 9px 7px; color: #536673; font-size: 10px; text-align: left; text-transform: uppercase; }
+      td { border-bottom: 1px solid #dfe5e7; padding: 10px 7px; }
+      .total { display: flex; justify-content: flex-end; gap: 40px; border-top: 2px solid #102a43; padding-top: 13px; font-size: 15px; font-weight: bold; }
+      .footer { margin-top: 42px; border-top: 1px solid #dfe5e7; padding-top: 10px; color: #667682; font-size: 10px; }
+      @media print { body { margin: 14mm; } .no-print { display: none; } }
+    </style></head><body>
+      <header class="header">
+        <div><div class="hotel">Nemsu Tagbina Hotel</div><p>Front Desk Console</p></div>
+        <div class="meta"><p>Business Date: ${escapeHtml(document.querySelector("#businessDate").textContent)}</p><p>Printed by: ${escapeHtml(state.session.user)} | ${escapeHtml(state.session.shift)}</p></div>
+      </header>
+      <h1>${escapeHtml(title)}</h1><div class="subtitle">${escapeHtml(subtitle)}</div>
+      ${body}
+      <div class="footer">Generated from the current Front Desk Console session. Nemsu Tagbina Hotel operational document.</div>
+    </body></html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.setTimeout(() => printWindow.print(), 180);
+}
+
+function printReservation() {
+  const reservation = state.reservations.find((item) => item.id === state.printableReservationId);
+  if (!reservation) return notify("Open a reservation before printing.");
+  const details = [
+    ["Confirmation No.", reservation.confirmation],
+    ["Reservation Status", reservation.status.toUpperCase()],
+    ["Guest Name", reservation.guest],
+    ["Guest Profile", reservation.guestProfileId],
+    ["Arrival", formatDate(reservation.arrivalDate)],
+    ["Departure", formatDate(reservation.departureDate)],
+    ["Room Type", reservation.roomType],
+    ["Assigned Room", reservation.room || "To be assigned"],
+    ["Occupancy", `${reservation.adults} adult(s), ${reservation.children} child(ren)`],
+    ["Rate Plan", reservation.ratePlan],
+    ["Nightly Rate", formatPeso(reservation.nightlyRate)],
+    ["Estimated Total", formatPeso(reservation.nightlyRate * nightsBetween(reservation.arrivalDate, reservation.departureDate))],
+    ["Guarantee", reservation.paymentMethod],
+    ["Contact", reservation.phone || "Not provided"],
+    ["Email", reservation.email || "Not provided"],
+    ["VIP", reservation.vip ? "Yes" : "No"]
+  ];
+  const detailHtml = `<div class="details">${details.map(([label, value]) => `<div class="detail"><span>${escapeHtml(label)}</span>${escapeHtml(value)}</div>`).join("")}</div>
+    <div class="detail"><span>Notes / Preferences</span>${escapeHtml(reservation.notes || "None recorded")}</div>`;
+  openPrintDocument("Reservation Confirmation", `${reservation.guest} | ${reservation.confirmation}`, detailHtml);
+  addActivity("Reservation confirmation printed", reservation.confirmation);
+  renderActivity();
+}
+
+function printFolio() {
+  const stay = state.stays.find((item) => item.id === state.printableStayId);
+  if (!stay) return notify("Open a folio before printing.");
+  const ledger = printTable(
+    ["Type", "Description", "Reference", "Amount"],
+    stay.folio.map((item) => [item.type, item.description, item.reference, formatPeso(item.amount)])
+  );
+  const body = `<div class="details">
+      <div class="detail"><span>Guest</span>${escapeHtml(stay.guest)}</div>
+      <div class="detail"><span>Room</span>${escapeHtml(stay.room)}</div>
+      <div class="detail"><span>Departure</span>${escapeHtml(formatDate(stay.departureDate))}</div>
+      <div class="detail"><span>Folio Status</span>${balanceFor(stay) === 0 ? "Settled" : "Open"}</div>
+    </div>${ledger}<div class="total"><span>Balance Due</span><span>${escapeHtml(formatPeso(balanceFor(stay)))}</span></div>`;
+  openPrintDocument("Guest Folio", `${stay.guest} | Room ${stay.room}`, body);
+  addActivity("Guest folio printed", `${stay.guest} - Room ${stay.room}`);
+  renderActivity();
+}
+
+function printReport(report) {
+  let subtitle = "Current business date operational report";
+  let body = "";
+  if (report === "Arrival Forecast") {
+    body = printTable(
+      ["Confirmation", "Guest", "Arrival", "Room Type", "Assigned Room", "Status"],
+      activeReservations().map((item) => [item.confirmation, item.guest, formatDate(item.arrivalDate), item.roomType, item.room || "Unassigned", item.status.toUpperCase()])
+    );
+  }
+  if (report === "Room State Summary") {
+    body = printTable(
+      ["Room", "Type", "Occupancy", "Housekeeping", "Maintenance", "Guest"],
+      state.rooms.map((room) => [room.number, room.type, occupancyLabels[room.occupancy], housekeepingLabels[room.housekeeping], maintenanceLabels[room.maintenance], room.guest || ""])
+    );
+  }
+  if (report === "Cashier Ledger") {
+    const stays = inHouseStays();
+    body = printTable(
+      ["Guest", "Room", "Postings", "Balance Due"],
+      stays.map((stay) => [stay.guest, stay.room, String(stay.folio.length), formatPeso(balanceFor(stay))])
+    ) + `<div class="total"><span>Total Outstanding</span><span>${escapeHtml(formatPeso(stays.reduce((sum, stay) => sum + balanceFor(stay), 0)))}</span></div>`;
+  }
+  if (report === "Departure List") {
+    body = printTable(
+      ["Guest", "Room", "Departure", "Balance", "Ready For Check-Out"],
+      inHouseStays().map((stay) => [stay.guest, stay.room, formatDate(stay.departureDate), formatPeso(balanceFor(stay)), balanceFor(stay) === 0 ? "Yes" : "No"])
+    );
+  }
+  openPrintDocument(report, subtitle, body);
+  addActivity("Operational report printed", report);
+  renderActivity();
+}
+
 document.querySelectorAll("[data-close]").forEach((button) => {
   button.addEventListener("click", () => document.querySelector(`#${button.dataset.close}`).close());
 });
+
+document.querySelector("#printReservationButton").addEventListener("click", printReservation);
+document.querySelector("#printFolioButton").addEventListener("click", printFolio);
 
 elements.newReservationButton.addEventListener("click", () => {
   if (!hasFrontDeskAccess()) return notify("Reservation access is not assigned to this role.");
@@ -651,7 +796,8 @@ elements.moduleWorkspace.addEventListener("click", (event) => {
   }
   if (event.target.dataset.report) {
     if (!permitted("reports")) return notify("Reporting access is required.");
-    notify(`${event.target.dataset.report} generated for review.`);
+    printReport(event.target.dataset.report);
+    notify(`${event.target.dataset.report} opened for printing.`);
   }
 });
 

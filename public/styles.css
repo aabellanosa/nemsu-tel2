@@ -694,6 +694,12 @@ td:first-child {
   font-size: 12px;
 }
 
+.report-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .modal {
   width: min(590px, calc(100vw - 42px));
   border: 0;

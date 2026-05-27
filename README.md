@@ -43,6 +43,7 @@ The existing navy and gold screen remains usable before Tailwind is built. Tailw
 - Separate front-office occupancy, housekeeping, and maintenance room statuses
 - In-house folio ledger with charge/payment postings and calculated balances
 - Expanded reservation capture and presentation for stay dates, occupants, rates, guarantee, contact, and notes
+- Browser-printable reservation confirmations, guest folios, arrival forecasts, room state summaries, cashier ledgers, and departure lists
 - Guest/confirmation/room quick lookup
 - Shift activity feed
 
