@@ -6,7 +6,7 @@ const maintenanceLabels = { inService: "In Service", outOfService: "Out of Servi
 const roleAccess = {
   "Front Desk Agent": ["dashboard", "reservations", "rooms", "departures"],
   "Front Desk Supervisor": ["dashboard", "reservations", "rooms", "departures", "housekeeping", "cashiering", "reports"],
-  Cashier: ["dashboard", "cashiering", "departures"],
+  "Cashier": ["dashboard", "cashiering", "departures"],
   "Housekeeping Supervisor": ["housekeeping", "rooms"],
   "Night Auditor": ["dashboard", "departures", "cashiering", "reports"]
 };
@@ -64,7 +64,7 @@ const state = {
       id: 3, confirmation: "GH-28524", status: "due-in", guestProfileId: "GP-1003", guest: "Maria Velasco",
       phone: "+63 917 555 0133", email: "maria@example.com", arrivalDate: dateKey, departureDate: offsetDate(3),
       eta: "3:15 PM", roomType: "Deluxe Twin", room: null, adults: 2, children: 1, ratePlan: "BAR",
-      nightlyRate: 5250, paymentMethod: "Pay at Hotel", notes: "Late checkout requested.", vip: true
+      nightlyRate: 5250, paymentMethod: "Pay at Hostel", notes: "Late checkout requested.", vip: true
     },
     {
       id: 4, confirmation: "GH-28538", status: "due-in", guestProfileId: "GP-1004", guest: "James Wu",
@@ -581,12 +581,12 @@ function openPrintDocument(title, subtitle, body) {
       @media print { body { margin: 14mm; } .no-print { display: none; } }
     </style></head><body>
       <header class="header">
-        <div><div class="hotel">Nemsu Tagbina Hotel</div><p>Front Desk Console</p></div>
+        <div><div class="hotel">Nemsu Tagbina Mini Hostel</div><p>Front Desk Console</p></div>
         <div class="meta"><p>Business Date: ${escapeHtml(document.querySelector("#businessDate").textContent)}</p><p>Printed by: ${escapeHtml(state.session.user)} | ${escapeHtml(state.session.shift)}</p></div>
       </header>
       <h1>${escapeHtml(title)}</h1><div class="subtitle">${escapeHtml(subtitle)}</div>
       ${body}
-      <div class="footer">Generated from the current Front Desk Console session. Nemsu Tagbina Hotel operational document.</div>
+      <div class="footer">Generated from the current Front Desk Console session. Nemsu Tagbina Mini Hostel operational document.</div>
     </body></html>`);
   printWindow.document.close();
   printWindow.focus();
