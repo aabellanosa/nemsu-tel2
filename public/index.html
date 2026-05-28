@@ -154,7 +154,8 @@
           <button class="close-button" type="button" data-close="reservationModal" aria-label="Close">&times;</button>
         </div>
         <div class="form-grid">
-          <label>Guest name<input name="guestName" required placeholder="Full name"></label>
+          <label>Guest first name<input name="guestFirstName" required placeholder="First name"></label>
+          <label>Guest last name<input name="guestLastName" required placeholder="Last name"></label>
           <label>Arrival date<input name="arrivalDate" type="date" required></label>
           <label>Departure date<input name="departureDate" type="date" required></label>
           <label>Room type
@@ -187,6 +188,20 @@
           </label>
           <label>Contact number<input name="phone" type="tel" placeholder="+63 9xx xxx xxxx"></label>
           <label>Email<input name="email" type="email" placeholder="guest@example.com"></label>
+          <label>ID type
+            <select name="idType" required>
+              <option>Passport</option>
+              <option>Driver's License</option>
+              <option>National ID</option>
+              <option>UMID</option>
+              <option>PhilHealth ID</option>
+              <option>SSS ID</option>
+              <option>PRC ID</option>
+              <option>Company ID</option>
+              <option>Other Government ID</option>
+            </select>
+          </label>
+          <label>ID number<input name="idNumber" required placeholder="Document number"></label>
           <label>VIP Status
             <select name="vip">
               <option value="false">Standard</option>

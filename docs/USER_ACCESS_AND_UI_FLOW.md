@@ -41,7 +41,8 @@
   - Active in-house stays.
   - Room issues requiring attention.
 - Can create reservations and record:
-  - Guest name and contact information.
+  - Guest first name, guest last name, and contact information.
+  - Guest ID type and ID number.
   - Arrival and departure dates.
   - Adults and children.
   - Requested room type.
@@ -178,6 +179,10 @@
 - User opens `New Reservation`.
 - User captures:
   - Guest name.
+  - Guest first name.
+  - Guest last name.
+  - Guest ID type.
+  - Guest ID number.
   - Arrival date.
   - Departure date.
   - Requested room type.
@@ -200,6 +205,8 @@
 
 - Reservations tab lists active reservations with:
   - Guest and confirmation information.
+  - Guest first name and last name.
+  - ID type and ID number.
   - Stay dates and number of nights.
   - Requested room type and assigned room.
   - Nightly rate, rate plan, and payment guarantee.
@@ -234,6 +241,7 @@
   - Maintenance condition is `In Service`.
 - Check-in review screen displays:
   - Guest and confirmation number.
+  - Guest ID type and ID number.
   - Stay dates and duration.
   - Assigned room and requested room type.
   - Nightly rate.

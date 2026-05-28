@@ -38,6 +38,10 @@ function nightsBetween(arrivalDate, departureDate) {
   return Math.max(1, Math.round((new Date(departureDate) - new Date(arrivalDate)) / 86400000));
 }
 
+function guestName(record) {
+  return [record.guestFirstName, record.guestLastName].filter(Boolean).join(" ") || record.guest || "";
+}
+
 const state = {
   session: { user: "A. Santos", role: "Front Desk Agent", shift: "Morning", signedIn: true },
   activeView: "dashboard",
@@ -49,25 +53,29 @@ const state = {
   handovers: [],
   reservations: [
     {
-      id: 1, confirmation: "GH-28491", status: "due-in", guestProfileId: "GP-1001", guest: "Alicia Fernandez",
+      id: 1, confirmation: "GH-28491", status: "due-in", guestProfileId: "GP-1001", guestFirstName: "Alicia", guestLastName: "Fernandez",
+      idType: "Passport", idNumber: "P1234567",
       phone: "+63 917 555 0131", email: "alicia@example.com", arrivalDate: dateKey, departureDate: offsetDate(2),
       eta: "12:30 PM", roomType: "Executive Suite", room: "402", adults: 2, children: 0, ratePlan: "BAR",
       nightlyRate: 7200, paymentMethod: "Credit Card Guarantee", notes: "High floor preferred.", vip: true
     },
     {
-      id: 2, confirmation: "GH-28506", status: "due-in", guestProfileId: "GP-1002", guest: "Robert Delgado",
+      id: 2, confirmation: "GH-28506", status: "due-in", guestProfileId: "GP-1002", guestFirstName: "Robert", guestLastName: "Delgado",
+      idType: "Driver's License", idNumber: "N01-23-456789",
       phone: "+63 917 555 0132", email: "", arrivalDate: dateKey, departureDate: offsetDate(1),
       eta: "2:00 PM", roomType: "Deluxe King", room: "318", adults: 1, children: 0, ratePlan: "CORP",
       nightlyRate: 4800, paymentMethod: "Direct Bill", notes: "", vip: false
     },
     {
-      id: 3, confirmation: "GH-28524", status: "due-in", guestProfileId: "GP-1003", guest: "Maria Velasco",
+      id: 3, confirmation: "GH-28524", status: "due-in", guestProfileId: "GP-1003", guestFirstName: "Maria", guestLastName: "Velasco",
+      idType: "National ID", idNumber: "1234-5678-9012",
       phone: "+63 917 555 0133", email: "maria@example.com", arrivalDate: dateKey, departureDate: offsetDate(3),
       eta: "3:15 PM", roomType: "Deluxe Twin", room: null, adults: 2, children: 1, ratePlan: "BAR",
       nightlyRate: 5250, paymentMethod: "Pay at Hostel", notes: "Late checkout requested.", vip: true
     },
     {
-      id: 4, confirmation: "GH-28538", status: "due-in", guestProfileId: "GP-1004", guest: "James Wu",
+      id: 4, confirmation: "GH-28538", status: "due-in", guestProfileId: "GP-1004", guestFirstName: "James", guestLastName: "Wu",
+      idType: "Passport", idNumber: "E7654321",
       phone: "", email: "", arrivalDate: dateKey, departureDate: offsetDate(1),
       eta: "5:30 PM", roomType: "Standard Queen", room: null, adults: 1, children: 0, ratePlan: "BAR",
       nightlyRate: 3900, paymentMethod: "Cash Deposit", notes: "", vip: false
@@ -229,7 +237,7 @@ function renderArrivals() {
   });
   elements.arrivalsTable.innerHTML = filtered.length ? filtered.map((reservation) => `
     <tr>
-      <td>${reservation.guest}${reservation.vip ? '<span class="tag vip">VIP</span>' : ""}</td>
+      <td>${guestName(reservation)}${reservation.vip ? '<span class="tag vip">VIP</span>' : ""}</td>
       <td>${reservation.confirmation}</td><td>${reservation.eta}</td><td>${reservation.room || "Unassigned"}</td>
       <td><span class="tag ${reservation.room ? "ready" : "pending"}">${reservation.room ? "Ready" : "Pending"}</span></td>
       <td><button class="row-action" data-arrival="${reservation.id}">${reservation.room ? "Review / Check In" : "Assign"}</button></td>
@@ -280,7 +288,7 @@ function renderReservationsWorkspace() {
         <thead><tr><th>Guest / Confirmation</th><th>Stay</th><th>Room Type / Room</th><th>Rate / Guarantee</th><th></th></tr></thead>
         <tbody>${reservations.map((reservation) => `
           <tr>
-            <td>${reservation.guest}<br><small>${reservation.confirmation}${reservation.vip ? " | VIP" : ""}</small></td>
+            <td>${guestName(reservation)}<br><small>${reservation.confirmation}${reservation.vip ? " | VIP" : ""}</small></td>
             <td>${formatDate(reservation.arrivalDate)} - ${formatDate(reservation.departureDate)}<br><small>${nightsBetween(reservation.arrivalDate, reservation.departureDate)} night(s)</small></td>
             <td>${reservation.roomType}<br><small>${reservation.room || "Unassigned"}</small></td>
             <td>${formatPeso(reservation.nightlyRate)} / ${reservation.ratePlan}<br><small>${reservation.paymentMethod}</small></td>
@@ -433,23 +441,27 @@ function assignAvailableRoom(reservation) {
   }
   reservation.room = room.number;
   room.occupancy = "assigned";
-  room.guest = reservation.guest;
-  addActivity(`Room ${room.number} assigned`, `${reservation.guest} - ${reservation.confirmation}`);
+  room.guest = guestName(reservation);
+  addActivity(`Room ${room.number} assigned`, `${guestName(reservation)} - ${reservation.confirmation}`);
   return true;
 }
 
 function openReservationDetail(id) {
   const reservation = state.reservations.find((item) => item.id === Number(id));
   state.printableReservationId = reservation.id;
-  document.querySelector("#reservationDetailTitle").textContent = `${reservation.guest} | ${reservation.confirmation}`;
+  document.querySelector("#reservationDetailTitle").textContent = `${guestName(reservation)} | ${reservation.confirmation}`;
   document.querySelector("#reservationDetailContent").innerHTML = `
     <div class="detail-cell"><span>Status</span>${reservation.status.toUpperCase()}</div>
     <div class="detail-cell"><span>Guest Profile</span>${reservation.guestProfileId}</div>
+    <div class="detail-cell"><span>First Name</span>${reservation.guestFirstName}</div>
+    <div class="detail-cell"><span>Last Name</span>${reservation.guestLastName}</div>
     <div class="detail-cell"><span>Stay Dates</span>${formatDate(reservation.arrivalDate)} - ${formatDate(reservation.departureDate)} (${nightsBetween(reservation.arrivalDate, reservation.departureDate)} night(s))</div>
     <div class="detail-cell"><span>Occupancy</span>${reservation.adults} adult(s), ${reservation.children} child(ren)</div>
     <div class="detail-cell"><span>Room</span>${reservation.roomType} / ${reservation.room || "Unassigned"}</div>
     <div class="detail-cell"><span>Rate</span>${reservation.ratePlan} | ${formatPeso(reservation.nightlyRate)} nightly</div>
     <div class="detail-cell"><span>Guarantee</span>${reservation.paymentMethod}</div>
+    <div class="detail-cell"><span>ID Type</span>${reservation.idType}</div>
+    <div class="detail-cell"><span>ID Number</span>${reservation.idNumber}</div>
     <div class="detail-cell"><span>Contact</span>${reservation.phone || "No phone"}<br>${reservation.email || "No email"}</div>
     <div class="detail-cell full"><span>Notes / Preferences</span>${reservation.notes || "None recorded"}</div>`;
   elements.reservationDetailModal.showModal();
@@ -461,21 +473,22 @@ function beginArrivalAction(id) {
   if (!reservation.room) {
     if (assignAvailableRoom(reservation)) {
       renderAll();
-      notify(`${reservation.guest} assigned to room ${reservation.room}.`);
+      notify(`${guestName(reservation)} assigned to room ${reservation.room}.`);
     }
     return;
   }
   const room = state.rooms.find((item) => item.number === reservation.room);
-  if (!room || room.occupancy !== "assigned" || room.guest !== reservation.guest || room.maintenance !== "inService" || !["clean", "inspected"].includes(room.housekeeping)) {
+  if (!room || room.occupancy !== "assigned" || room.guest !== guestName(reservation) || room.maintenance !== "inService" || !["clean", "inspected"].includes(room.housekeeping)) {
     notify("Assigned room is not ready for check-in. Review room status first.");
     return;
   }
   state.activeReservationId = reservation.id;
   document.querySelector("#checkInOverview").innerHTML = `
-    <strong>${reservation.guest}</strong> | ${reservation.confirmation}<br>
+    <strong>${guestName(reservation)}</strong> | ${reservation.confirmation}<br>
     Stay: ${formatDate(reservation.arrivalDate)} - ${formatDate(reservation.departureDate)} (${nightsBetween(reservation.arrivalDate, reservation.departureDate)} night(s))<br>
     Room: ${reservation.room} / ${reservation.roomType} | Rate: ${formatPeso(reservation.nightlyRate)} per night<br>
     Room Readiness: ${housekeepingLabels[room.housekeeping]} / ${maintenanceLabels[room.maintenance]}<br>
+    ID: ${reservation.idType} / ${reservation.idNumber}<br>
     Notes: ${reservation.notes || "None recorded"}
   `;
   document.querySelector("#checkInPaymentMethod").value = reservation.paymentMethod;
@@ -491,21 +504,21 @@ function completeCheckIn() {
   reservation.status = "checked-in";
   reservation.paymentMethod = document.querySelector("#checkInPaymentMethod").value;
   room.occupancy = "occupied";
-  room.guest = reservation.guest;
+  room.guest = guestName(reservation);
   const lodgingTotal = reservation.nightlyRate * nightsBetween(reservation.arrivalDate, reservation.departureDate);
   state.stays.unshift({
     id: Date.now(),
     reservationId: reservation.id,
-    guest: reservation.guest,
+    guest: guestName(reservation),
     room: reservation.room,
     departureDate: reservation.departureDate,
     status: "in-house",
     folio: [{ type: "Room Charge", description: `${nightsBetween(reservation.arrivalDate, reservation.departureDate)} night accommodation`, amount: lodgingTotal, reference: `POST-${reservation.confirmation}` }]
   });
-  addActivity(`${reservation.guest} checked in`, `Room ${reservation.room} | ${document.querySelector("#checkInKeys").value} key(s) issued`);
+  addActivity(`${guestName(reservation)} checked in`, `Room ${reservation.room} | ${document.querySelector("#checkInKeys").value} key(s) issued`);
   elements.checkInModal.close();
   renderAll();
-  notify(`Check-in completed for ${reservation.guest}.`);
+  notify(`Check-in completed for ${guestName(reservation)}.`);
 }
 
 function openRoom(number) {
@@ -599,7 +612,8 @@ function printReservation() {
   const details = [
     ["Confirmation No.", reservation.confirmation],
     ["Reservation Status", reservation.status.toUpperCase()],
-    ["Guest Name", reservation.guest],
+    ["Guest First Name", reservation.guestFirstName],
+    ["Guest Last Name", reservation.guestLastName],
     ["Guest Profile", reservation.guestProfileId],
     ["Arrival", formatDate(reservation.arrivalDate)],
     ["Departure", formatDate(reservation.departureDate)],
@@ -610,13 +624,15 @@ function printReservation() {
     ["Nightly Rate", formatPeso(reservation.nightlyRate)],
     ["Estimated Total", formatPeso(reservation.nightlyRate * nightsBetween(reservation.arrivalDate, reservation.departureDate))],
     ["Guarantee", reservation.paymentMethod],
+    ["ID Type", reservation.idType],
+    ["ID Number", reservation.idNumber],
     ["Contact", reservation.phone || "Not provided"],
     ["Email", reservation.email || "Not provided"],
     ["VIP", reservation.vip ? "Yes" : "No"]
   ];
   const detailHtml = `<div class="details">${details.map(([label, value]) => `<div class="detail"><span>${escapeHtml(label)}</span>${escapeHtml(value)}</div>`).join("")}</div>
     <div class="detail"><span>Notes / Preferences</span>${escapeHtml(reservation.notes || "None recorded")}</div>`;
-  openPrintDocument("Reservation Confirmation", `${reservation.guest} | ${reservation.confirmation}`, detailHtml);
+  openPrintDocument("Reservation Confirmation", `${guestName(reservation)} | ${reservation.confirmation}`, detailHtml);
   addActivity("Reservation confirmation printed", reservation.confirmation);
   renderActivity();
 }
@@ -645,7 +661,7 @@ function printReport(report) {
   if (report === "Arrival Forecast") {
     body = printTable(
       ["Confirmation", "Guest", "Arrival", "Room Type", "Assigned Room", "Status"],
-      activeReservations().map((item) => [item.confirmation, item.guest, formatDate(item.arrivalDate), item.roomType, item.room || "Unassigned", item.status.toUpperCase()])
+      activeReservations().map((item) => [item.confirmation, guestName(item), formatDate(item.arrivalDate), item.roomType, item.room || "Unassigned", item.status.toUpperCase()])
     );
   }
   if (report === "Room State Summary") {
@@ -695,14 +711,19 @@ document.querySelector("#reservationForm").addEventListener("submit", (event) =>
   const id = Date.now();
   const reservation = {
     id, confirmation: `GH-${String(id).slice(-5)}`, status: values.get("arrivalDate") === dateKey ? "due-in" : "reserved", guestProfileId: `GP-${String(id).slice(-5)}`,
-    guest: values.get("guestName"), arrivalDate: values.get("arrivalDate"), departureDate: values.get("departureDate"),
+    guestFirstName: values.get("guestFirstName").trim(),
+    guestLastName: values.get("guestLastName").trim(),
+    idType: values.get("idType"),
+    idNumber: values.get("idNumber").trim(),
+    arrivalDate: values.get("arrivalDate"),
+    departureDate: values.get("departureDate"),
     eta: new Date(`2000-01-01T${values.get("eta")}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
     roomType: values.get("roomType"), room: null, adults: Number(values.get("adults")), children: Number(values.get("children")),
     ratePlan: values.get("ratePlan"), nightlyRate: Number(values.get("nightlyRate")), paymentMethod: values.get("paymentMethod"),
     phone: values.get("phone"), email: values.get("email"), notes: values.get("notes"), vip: values.get("vip") === "true"
   };
   state.reservations.push(reservation);
-  addActivity("Reservation created", `${reservation.guest} - ${reservation.confirmation}`);
+  addActivity("Reservation created", `${guestName(reservation)} - ${reservation.confirmation}`);
   event.target.reset();
   elements.reservationModal.close();
   renderAll();
@@ -748,7 +769,7 @@ elements.assignRoomButton.addEventListener("click", () => {
   if (!pending) return notify("All due-in reservations already have assigned rooms.");
   if (assignAvailableRoom(pending)) {
     renderAll();
-    notify(`Room ${pending.room} assigned to ${pending.guest}.`);
+    notify(`Room ${pending.room} assigned to ${guestName(pending)}.`);
   }
 });
 
@@ -805,9 +826,9 @@ document.querySelector("#globalSearch").addEventListener("input", (event) => {
   const query = event.target.value.trim().toLowerCase();
   const feedback = document.querySelector("#searchFeedback");
   if (!query) return void (feedback.textContent = "Ready for lookup");
-  const reservation = state.reservations.find((item) => item.guest.toLowerCase().includes(query) || item.confirmation.toLowerCase().includes(query) || (item.room || "").includes(query));
+  const reservation = state.reservations.find((item) => guestName(item).toLowerCase().includes(query) || item.confirmation.toLowerCase().includes(query) || item.idNumber.toLowerCase().includes(query) || (item.room || "").includes(query));
   const stay = inHouseStays().find((item) => item.guest.toLowerCase().includes(query) || item.room.includes(query));
-  feedback.textContent = reservation ? `Reservation: ${reservation.guest}` : stay ? `In House: ${stay.guest}` : "No matching guest found";
+  feedback.textContent = reservation ? `Reservation: ${guestName(reservation)}` : stay ? `In House: ${stay.guest}` : "No matching guest found";
 });
 
 document.querySelector("#navigation").addEventListener("click", (event) => {
