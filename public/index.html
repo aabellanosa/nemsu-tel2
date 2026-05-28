@@ -298,6 +298,27 @@
           </label>
           <label>Room keys issued<input id="checkInKeys" type="number" min="1" value="2" required></label>
         </div>
+        <div class="payment-card">
+          <div class="panel-heading compact-heading">
+            <div>
+              <p class="eyebrow">Mock EFT</p>
+              <h3>Card Authorization</h3>
+            </div>
+            <span class="state-pill" id="checkInCardBrand">No Card</span>
+          </div>
+          <div class="form-grid">
+            <label>Cardholder name<input id="checkInCardholder" placeholder="Name on card"></label>
+            <label>Card number<input id="checkInCardNumber" inputmode="numeric" placeholder="4111 1111 1111 1111"></label>
+            <label>Expiry month<input id="checkInExpiryMonth" inputmode="numeric" maxlength="2" placeholder="MM"></label>
+            <label>Expiry year<input id="checkInExpiryYear" inputmode="numeric" maxlength="4" placeholder="YYYY"></label>
+            <label>CVV<input id="checkInCvv" inputmode="numeric" maxlength="4" placeholder="CVV"></label>
+            <label>Authorization amount (PHP)<input id="checkInAuthAmount" type="number" min="0" step="0.01"></label>
+          </div>
+          <div class="modal-actions compact-actions">
+            <span id="checkInCardFeedback" class="payment-feedback">Card authorization is optional for this prototype.</span>
+            <button class="secondary-button" id="authorizeCardButton" type="button">Authorize Card</button>
+          </div>
+        </div>
         <label class="checkbox-row"><input id="checkInIdentity" type="checkbox" required> Guest identity / registration details reviewed.</label>
         <label class="checkbox-row"><input id="checkInRoomReady" type="checkbox" required> Room and payment guarantee confirmed for check-in.</label>
         <div class="modal-actions">
@@ -361,6 +382,52 @@
         <div class="modal-actions">
           <button class="secondary-button" type="button" data-close="postChargeModal">Cancel</button>
           <button class="primary-button" type="submit">Post to Folio</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="paymentModal" class="modal">
+      <form id="paymentForm">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Cashiering</p>
+            <h2>Post Payment</h2>
+          </div>
+          <button class="close-button" type="button" data-close="paymentModal" aria-label="Close">&times;</button>
+        </div>
+        <div id="paymentOverview" class="handover-summary"></div>
+        <div class="form-grid">
+          <label>Payment method
+            <select id="paymentMethodSelect" required>
+              <option value="card">Credit Card</option>
+              <option value="cash">Cash</option>
+            </select>
+          </label>
+          <label>Payment amount (PHP)<input id="paymentAmount" type="number" min="0" step="0.01" required></label>
+        </div>
+        <div id="cardPaymentSection" class="payment-card">
+          <div class="panel-heading compact-heading">
+            <div>
+              <p class="eyebrow">Mock EFT</p>
+              <h3>Card Capture</h3>
+            </div>
+            <span class="state-pill" id="paymentCardBrand">No Card</span>
+          </div>
+          <label class="status-select">Existing authorization
+            <select id="authorizationSelect"></select>
+          </label>
+          <div class="form-grid">
+            <label>Cardholder name<input id="paymentCardholder" placeholder="Name on card"></label>
+            <label>Card number<input id="paymentCardNumber" inputmode="numeric" placeholder="4111 1111 1111 1111"></label>
+            <label>Expiry month<input id="paymentExpiryMonth" inputmode="numeric" maxlength="2" placeholder="MM"></label>
+            <label>Expiry year<input id="paymentExpiryYear" inputmode="numeric" maxlength="4" placeholder="YYYY"></label>
+            <label>CVV<input id="paymentCvv" inputmode="numeric" maxlength="4" placeholder="CVV"></label>
+          </div>
+          <p id="paymentCardFeedback" class="payment-feedback">Use an existing authorization or enter a mock card.</p>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" data-close="paymentModal">Cancel</button>
+          <button class="primary-button" type="submit">Post Payment</button>
         </div>
       </form>
     </dialog>

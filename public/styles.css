@@ -805,6 +805,35 @@ td:first-child {
   accent-color: var(--gold);
 }
 
+.payment-card {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  background: #fafbfb;
+}
+
+.compact-heading {
+  padding: 0 0 14px;
+}
+
+.compact-actions {
+  justify-content: space-between;
+  margin-top: 15px;
+}
+
+.payment-feedback {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.payment-feedback.success {
+  color: var(--green);
+}
+
+.payment-feedback.error {
+  color: var(--red);
+}
+
 .login-intro {
   margin: 0 0 21px;
   color: var(--muted);

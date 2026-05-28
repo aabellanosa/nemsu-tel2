@@ -294,14 +294,51 @@
 
 - Available to Cashier and Front Desk Supervisor; also available to Night Auditor in the current prototype.
 - User selects `Post Payment` for an unsettled folio.
-- System appends a payment transaction equal to the outstanding balance.
-- Folio balance recalculates to zero.
-- Activity log records payment posting with active operator and shift.
+- User may settle by:
+  - Cash.
+  - Mock credit card sale.
+  - Capture of an existing mock card authorization.
+- For card payments, the prototype validates:
+  - Supported card brand.
+  - Luhn/card-number checksum.
+  - Non-expired card date.
+  - CVV length based on detected brand.
+- Supported mock card brands:
+  - Visa.
+  - Mastercard.
+  - American Express.
+  - JCB.
+  - Discover.
+- The UI stores and displays only masked card details, not the full card number.
+- On successful posting:
+  - A payment transaction is appended to the folio ledger.
+  - Folio balance recalculates.
+  - Card sale or card capture reference is recorded.
+  - Activity log records the payment approval/capture with active operator and shift.
 - Future production version should additionally capture:
   - Payment method and tendered amount.
   - Receipt/reference number.
   - Cash drawer or cashier session.
   - Refunds, adjustments, voids, and approval requirements.
+  - Payment-gateway token, authorization response, and settlement batch information.
+
+### Mock Credit Card Authorization
+
+- A card authorization is different from a payment posting.
+- Authorization reserves funds but does not reduce the guest folio balance.
+- Payment capture posts the actual payment transaction to the folio.
+- During check-in, staff may enter a mock credit card and authorize an amount for room charges plus incidentals.
+- The authorization record stores:
+  - Mock authorization number.
+  - Card brand.
+  - Masked card number.
+  - Cardholder name.
+  - Authorized amount.
+  - Authorization status.
+  - Operator and shift.
+- During cashiering, staff may capture an existing authorization if the guest pays by that card.
+- Capturing an authorization creates the actual negative payment line in the folio ledger.
+- Declined or invalid mock cards are recorded only in the session activity feed.
 
 ## Services / Add-On Charge Flow
 
@@ -466,6 +503,7 @@
 - User selection demonstrates roles but is not secure authentication.
 - Permissions are enforced in the UI only; a production API must enforce authorization.
 - Folio workflow presently supports sample charges and settlement payments only.
+- Credit card handling is simulated only; it does not contact a real payment gateway and must never be used for real card processing.
 - No cancellation, no-show, room move, upgrade, deposit processing, adjustment, refund, group block, or night-audit rollover workflow is included yet.
 - Services posting is manual and does not integrate with a restaurant POS yet.
 - Printable reports and folios are created from browser-session data only and are not generated from persisted records or archived.

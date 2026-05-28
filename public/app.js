@@ -43,15 +43,70 @@ function guestName(record) {
   return [record.guestFirstName, record.guestLastName].filter(Boolean).join(" ") || record.guest || "";
 }
 
+function cleanCardNumber(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function detectCardBrand(number) {
+  const card = cleanCardNumber(number);
+  const firstTwo = Number(card.slice(0, 2));
+  const firstFour = Number(card.slice(0, 4));
+  if (/^4/.test(card)) return "Visa";
+  if ((firstTwo >= 51 && firstTwo <= 55) || (firstFour >= 2221 && firstFour <= 2720)) return "Mastercard";
+  if (/^3[47]/.test(card)) return "American Express";
+  if (/^35/.test(card)) return "JCB";
+  if (/^6(?:011|5)/.test(card)) return "Discover";
+  return card ? "Unknown" : "No Card";
+}
+
+function passesLuhn(number) {
+  const digits = cleanCardNumber(number).split("").reverse().map(Number);
+  const sum = digits.reduce((total, digit, index) => {
+    if (index % 2 === 0) return total + digit;
+    const doubled = digit * 2;
+    return total + (doubled > 9 ? doubled - 9 : doubled);
+  }, 0);
+  return digits.length >= 12 && sum % 10 === 0;
+}
+
+function validateExpiry(month, year) {
+  const expiryMonth = Number(month);
+  const expiryYear = Number(year);
+  if (expiryMonth < 1 || expiryMonth > 12 || String(year).length !== 4) return false;
+  const expiry = new Date(expiryYear, expiryMonth, 0, 23, 59, 59);
+  return expiry >= new Date();
+}
+
+function validateMockCard({ cardholder, number, expiryMonth, expiryYear, cvv }) {
+  const cleanNumber = cleanCardNumber(number);
+  const brand = detectCardBrand(cleanNumber);
+  if (!cardholder.trim()) return { valid: false, brand, message: "Cardholder name is required." };
+  if (brand === "Unknown") return { valid: false, brand, message: "Unsupported or unrecognized card brand." };
+  if (!passesLuhn(cleanNumber)) return { valid: false, brand, message: "Card number failed validation." };
+  if (!validateExpiry(expiryMonth, expiryYear)) return { valid: false, brand, message: "Card expiry is invalid or expired." };
+  const cvvLength = brand === "American Express" ? 4 : 3;
+  if (!new RegExp(`^\\d{${cvvLength}}$`).test(String(cvv))) return { valid: false, brand, message: `${brand} CVV must be ${cvvLength} digits.` };
+  return { valid: true, brand, message: `${brand} card validated.` };
+}
+
+function maskCard(number) {
+  const cleanNumber = cleanCardNumber(number);
+  return `**** **** **** ${cleanNumber.slice(-4)}`;
+}
+
 const state = {
   session: { user: "A. Santos", role: "Front Desk Agent", shift: "Morning", signedIn: true },
   activeView: "dashboard",
   arrivalFilter: "all",
   activeRoom: null,
   activeReservationId: null,
+  activePaymentStayId: null,
+  pendingCheckInAuthorization: null,
   printableReservationId: null,
   printableStayId: null,
   handovers: [],
+  paymentMethods: [],
+  cardAuthorizations: [],
   reservations: [
     {
       id: 1, confirmation: "GH-28491", status: "due-in", guestProfileId: "GP-1001", guestFirstName: "Alicia", guestLastName: "Fernandez",
@@ -141,6 +196,7 @@ const elements = {
   checkInModal: document.querySelector("#checkInModal"),
   folioModal: document.querySelector("#folioModal"),
   postChargeModal: document.querySelector("#postChargeModal"),
+  paymentModal: document.querySelector("#paymentModal"),
   dashboardWorkspace: document.querySelector("#dashboardWorkspace"),
   moduleWorkspace: document.querySelector("#moduleWorkspace"),
   newReservationButton: document.querySelector("#newReservationButton"),
@@ -192,6 +248,10 @@ function canUpdateMaintenance() {
 
 function canCashier() {
   return permitted("cashiering");
+}
+
+function canPostPayments() {
+  return canCashier();
 }
 
 function canPostServices() {
@@ -363,8 +423,8 @@ function renderCashieringWorkspace() {
       { label: "Settled", value: stays.filter((stay) => balanceFor(stay) === 0).length }
     ])}
     <article class="panel workspace-panel"><div class="panel-heading"><div><p class="eyebrow">In House Accounts</p><h3>Open Folios</h3></div><button class="secondary-button" data-open-service-charge="true">Post Service Charge</button></div>
-      <div class="workspace-table"><table><thead><tr><th>Guest</th><th>Room</th><th>Balance</th><th>Ledger</th><th></th></tr></thead><tbody>
-        ${stays.map((stay) => `<tr><td>${stay.guest}</td><td>${stay.room}</td><td>${formatPeso(balanceFor(stay))}</td><td>${stay.folio.length} posting(s)</td>
+      <div class="workspace-table"><table><thead><tr><th>Guest</th><th>Room</th><th>Balance</th><th>Card Auth</th><th>Ledger</th><th></th></tr></thead><tbody>
+        ${stays.map((stay) => `<tr><td>${stay.guest}</td><td>${stay.room}</td><td>${formatPeso(balanceFor(stay))}</td><td>${authorizationsForStay(stay.id).length ? `${authorizationsForStay(stay.id)[0].brand} ${formatPeso(authorizationsForStay(stay.id)[0].amount)}` : "None"}</td><td>${stay.folio.length} posting(s)</td>
         <td><button class="row-action" data-view-folio="${stay.id}">View Ledger</button> <button class="row-action" data-service-stay="${stay.id}">Post Charge</button> ${balanceFor(stay) !== 0 ? `<button class="row-action" data-settle-folio="${stay.id}">Post Payment</button>` : '<span class="tag ready">Settled</span>'}</td></tr>`).join("")}
       </tbody></table></div>
     </article>`;
@@ -521,6 +581,14 @@ function beginArrivalAction(id) {
     Notes: ${reservation.notes || "None recorded"}
   `;
   document.querySelector("#checkInPaymentMethod").value = reservation.paymentMethod;
+  document.querySelector("#checkInAuthAmount").value = (reservation.nightlyRate * nightsBetween(reservation.arrivalDate, reservation.departureDate) + 3000).toFixed(2);
+  document.querySelector("#checkInCardholder").value = guestName(reservation);
+  document.querySelector("#checkInCardNumber").value = "";
+  document.querySelector("#checkInExpiryMonth").value = "";
+  document.querySelector("#checkInExpiryYear").value = "";
+  document.querySelector("#checkInCvv").value = "";
+  state.pendingCheckInAuthorization = null;
+  updateCheckInCardFeedback("Card authorization is optional for this prototype.", "No Card");
   document.querySelector("#checkInIdentity").checked = false;
   document.querySelector("#checkInRoomReady").checked = false;
   elements.checkInModal.showModal();
@@ -535,7 +603,7 @@ function completeCheckIn() {
   room.occupancy = "occupied";
   room.guest = guestName(reservation);
   const lodgingTotal = reservation.nightlyRate * nightsBetween(reservation.arrivalDate, reservation.departureDate);
-  state.stays.unshift({
+  const stay = {
     id: Date.now(),
     reservationId: reservation.id,
     guest: guestName(reservation),
@@ -543,7 +611,19 @@ function completeCheckIn() {
     departureDate: reservation.departureDate,
     status: "in-house",
     folio: [{ type: "Room Charge", description: `${nightsBetween(reservation.arrivalDate, reservation.departureDate)} night accommodation`, amount: lodgingTotal, reference: `POST-${reservation.confirmation}` }]
-  });
+  };
+  state.stays.unshift(stay);
+  if (state.pendingCheckInAuthorization) {
+    const authorization = state.pendingCheckInAuthorization;
+    authorization.reservationId = reservation.id;
+    authorization.stayId = stay.id;
+    const paymentMethod = state.paymentMethods.find((method) => method.id === authorization.paymentMethodId);
+    if (paymentMethod) {
+      paymentMethod.reservationId = reservation.id;
+      paymentMethod.stayId = stay.id;
+    }
+  }
+  state.pendingCheckInAuthorization = null;
   addActivity(`${guestName(reservation)} checked in`, `Room ${reservation.room} | ${document.querySelector("#checkInKeys").value} key(s) issued`);
   elements.checkInModal.close();
   renderAll();
@@ -569,11 +649,53 @@ function openFolio(stayId) {
   const stay = state.stays.find((item) => item.id === Number(stayId));
   state.printableStayId = stay.id;
   document.querySelector("#folioModalTitle").textContent = `${stay.guest} | Room ${stay.room}`;
+  const auths = authorizationsForStay(stay.id);
   document.querySelector("#folioLedger").innerHTML = `
+    ${auths.length ? `<div class="handover-summary">${auths.map((authorization) => `<strong>${authorization.id}</strong> ${authorization.brand} ${authorization.maskedNumber} authorized for ${formatPeso(authorization.amount)}`).join("<br>")}</div>` : ""}
     <table><thead><tr><th>Type</th><th>Description</th><th>Reference</th><th>Amount</th></tr></thead>
     <tbody>${stay.folio.map((item) => `<tr><td>${item.type}</td><td>${item.description}</td><td>${item.reference}</td><td>${formatPeso(item.amount)}</td></tr>`).join("")}</tbody></table>
     <div class="ledger-total"><span>Balance Due</span><span>${formatPeso(balanceFor(stay))}</span></div>`;
   elements.folioModal.showModal();
+}
+
+function authorizationsForStay(stayId) {
+  return state.cardAuthorizations.filter((authorization) => authorization.stayId === Number(stayId) && authorization.status === "Authorized");
+}
+
+function createMockPaymentMethod({ cardholder, number, expiryMonth, expiryYear }, links = {}) {
+  const brand = detectCardBrand(number);
+  const paymentMethod = {
+    id: `PM-${Date.now().toString().slice(-6)}-${state.paymentMethods.length + 1}`,
+    type: "card",
+    brand,
+    maskedNumber: maskCard(number),
+    cardholder: cardholder.trim(),
+    expiryMonth: String(expiryMonth).padStart(2, "0"),
+    expiryYear: String(expiryYear),
+    token: `tok_mock_${Date.now().toString(36)}`,
+    ...links
+  };
+  state.paymentMethods.push(paymentMethod);
+  return paymentMethod;
+}
+
+function createMockAuthorization(paymentMethod, amount, links = {}) {
+  const authorization = {
+    id: `AUTH-${Date.now().toString().slice(-6)}`,
+    paymentMethodId: paymentMethod.id,
+    brand: paymentMethod.brand,
+    maskedNumber: paymentMethod.maskedNumber,
+    cardholder: paymentMethod.cardholder,
+    amount,
+    status: "Authorized",
+    authorizedAt: new Date().toISOString(),
+    capturedAt: null,
+    operator: state.session.user,
+    shift: state.session.shift,
+    ...links
+  };
+  state.cardAuthorizations.push(authorization);
+  return authorization;
 }
 
 function populateServiceStaySelect(selectedStayId = "") {
@@ -592,6 +714,59 @@ function openPostCharge(stayId = "") {
   document.querySelector("#postChargeForm").reset();
   populateServiceStaySelect(stayId);
   elements.postChargeModal.showModal();
+}
+
+function openPayment(stayId) {
+  if (!canPostPayments()) {
+    notify("Cashiering access is required to post payments.");
+    return;
+  }
+  const stay = state.stays.find((item) => item.id === Number(stayId));
+  state.activePaymentStayId = stay.id;
+  const balance = balanceFor(stay);
+  document.querySelector("#paymentOverview").innerHTML = `
+    <strong>${stay.guest}</strong> | Room ${stay.room}<br>
+    Current folio balance: <strong>${formatPeso(balance)}</strong><br>
+    Existing authorized cards may be captured, or a new mock card can be entered.`;
+  document.querySelector("#paymentAmount").value = Math.max(balance, 0).toFixed(2);
+  document.querySelector("#paymentMethodSelect").value = "card";
+  document.querySelector("#paymentForm").reset();
+  document.querySelector("#paymentAmount").value = Math.max(balance, 0).toFixed(2);
+  document.querySelector("#paymentMethodSelect").value = "card";
+  document.querySelector("#cardPaymentSection").classList.remove("hidden");
+  const authorizations = populateAuthorizationSelect(stay.id);
+  if (authorizations.length) {
+    const authorization = authorizations[0];
+    updatePaymentCardFeedback(`${authorization.id} available for capture: ${authorization.brand} ${authorization.maskedNumber} / ${formatPeso(authorization.amount)}.`, authorization.brand, "success");
+  } else {
+    updatePaymentCardFeedback("Use an existing authorization or enter a mock card.", "No Card");
+  }
+  elements.paymentModal.showModal();
+}
+
+function populateAuthorizationSelect(stayId) {
+  const select = document.querySelector("#authorizationSelect");
+  const authorizations = authorizationsForStay(stayId);
+  select.innerHTML = authorizations.length
+    ? authorizations.map((authorization, index) => `
+      <option value="${authorization.id}" ${index === 0 ? "selected" : ""}>${authorization.brand} ${authorization.maskedNumber} | ${formatPeso(authorization.amount)} | ${authorization.id}</option>
+    `).join("") + '<option value="">Enter new card / no authorization</option>'
+    : '<option value="">Enter new card / no authorization</option>';
+  return authorizations;
+}
+
+function updateCheckInCardFeedback(message, brand, status = "") {
+  document.querySelector("#checkInCardBrand").textContent = brand;
+  const feedback = document.querySelector("#checkInCardFeedback");
+  feedback.textContent = message;
+  feedback.className = `payment-feedback ${status}`;
+}
+
+function updatePaymentCardFeedback(message, brand, status = "") {
+  document.querySelector("#paymentCardBrand").textContent = brand;
+  const feedback = document.querySelector("#paymentCardFeedback");
+  feedback.textContent = message;
+  feedback.className = `payment-feedback ${status}`;
 }
 
 function escapeHtml(value) {
@@ -818,9 +993,113 @@ document.querySelector("#postChargeForm").addEventListener("submit", (event) => 
   notify(`${formatPeso(amount)} posted to ${stay.guest}'s folio.`);
 });
 
+document.querySelector("#paymentMethodSelect").addEventListener("change", (event) => {
+  document.querySelector("#cardPaymentSection").classList.toggle("hidden", event.target.value !== "card");
+});
+
+document.querySelector("#authorizationSelect").addEventListener("change", (event) => {
+  if (!event.target.value) {
+    updatePaymentCardFeedback("Enter a new mock card for this payment.", "No Card");
+    return;
+  }
+  const authorization = state.cardAuthorizations.find((item) => item.id === event.target.value);
+  updatePaymentCardFeedback(`${authorization.id} selected for capture: ${authorization.brand} ${authorization.maskedNumber} / ${formatPeso(authorization.amount)}.`, authorization.brand, "success");
+});
+
+document.querySelector("#paymentCardNumber").addEventListener("input", (event) => {
+  document.querySelector("#paymentCardBrand").textContent = detectCardBrand(event.target.value);
+});
+
+document.querySelector("#checkInCardNumber").addEventListener("input", (event) => {
+  document.querySelector("#checkInCardBrand").textContent = detectCardBrand(event.target.value);
+});
+
+document.querySelector("#paymentForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!canPostPayments()) return notify("Cashiering access is required.");
+  if (!event.target.reportValidity()) return;
+  const stay = state.stays.find((item) => item.id === state.activePaymentStayId);
+  const amount = Number(document.querySelector("#paymentAmount").value);
+  if (!stay || stay.status !== "in-house") return notify("Select an active in-house stay.");
+  if (amount <= 0) return notify("Payment amount must be greater than zero.");
+  let source = "cash";
+  let description = "Cash payment";
+  let reference = `PAY-${Date.now().toString().slice(-5)}`;
+  if (document.querySelector("#paymentMethodSelect").value === "card") {
+    source = "card";
+    const selectedAuthId = document.querySelector("#authorizationSelect").value;
+    if (selectedAuthId) {
+      const authorization = state.cardAuthorizations.find((item) => item.id === selectedAuthId);
+      if (amount > authorization.amount) {
+        updatePaymentCardFeedback("Capture amount exceeds authorized amount.", authorization.brand, "error");
+        return;
+      }
+      authorization.status = "Captured";
+      authorization.capturedAt = new Date().toISOString();
+      description = `${authorization.brand} card capture ${authorization.maskedNumber}`;
+      reference = `CAP-${authorization.id.replace("AUTH-", "")}`;
+      addActivity("Card authorization captured", `${stay.guest} - ${formatPeso(amount)} - ${authorization.id}`);
+    } else {
+      const cardData = {
+        cardholder: document.querySelector("#paymentCardholder").value,
+        number: document.querySelector("#paymentCardNumber").value,
+        expiryMonth: document.querySelector("#paymentExpiryMonth").value,
+        expiryYear: document.querySelector("#paymentExpiryYear").value,
+        cvv: document.querySelector("#paymentCvv").value
+      };
+      const validation = validateMockCard(cardData);
+      if (!validation.valid) {
+        updatePaymentCardFeedback(validation.message, validation.brand, "error");
+        addActivity("Card payment declined", `${stay.guest} - ${validation.message}`);
+        return;
+      }
+      const paymentMethod = createMockPaymentMethod(cardData, { stayId: stay.id });
+      const authorization = createMockAuthorization(paymentMethod, amount, { stayId: stay.id });
+      authorization.status = "Captured";
+      authorization.capturedAt = new Date().toISOString();
+      description = `${paymentMethod.brand} card sale ${paymentMethod.maskedNumber}`;
+      reference = `SALE-${authorization.id.replace("AUTH-", "")}`;
+      addActivity("Card payment approved", `${stay.guest} - ${formatPeso(amount)} - ${authorization.id}`);
+    }
+  }
+  stay.folio.push({ type: "Payment", source, description, amount: -amount, reference });
+  elements.paymentModal.close();
+  event.target.reset();
+  renderAll();
+  notify(`${formatPeso(amount)} payment posted to ${stay.guest}'s folio.`);
+});
+
 document.querySelector("#checkInForm").addEventListener("submit", (event) => {
   event.preventDefault();
   if (event.target.reportValidity()) completeCheckIn();
+});
+
+document.querySelector("#authorizeCardButton").addEventListener("click", () => {
+  const reservation = state.reservations.find((item) => item.id === state.activeReservationId);
+  const cardData = {
+    cardholder: document.querySelector("#checkInCardholder").value,
+    number: document.querySelector("#checkInCardNumber").value,
+    expiryMonth: document.querySelector("#checkInExpiryMonth").value,
+    expiryYear: document.querySelector("#checkInExpiryYear").value,
+    cvv: document.querySelector("#checkInCvv").value
+  };
+  const validation = validateMockCard(cardData);
+  if (!validation.valid) {
+    state.pendingCheckInAuthorization = null;
+    updateCheckInCardFeedback(validation.message, validation.brand, "error");
+    addActivity("Card authorization declined", `${reservation ? guestName(reservation) : "Guest"} - ${validation.message}`);
+    return;
+  }
+  const amount = Number(document.querySelector("#checkInAuthAmount").value);
+  if (amount <= 0) {
+    updateCheckInCardFeedback("Authorization amount must be greater than zero.", validation.brand, "error");
+    return;
+  }
+  const paymentMethod = createMockPaymentMethod(cardData, { reservationId: reservation.id });
+  const authorization = createMockAuthorization(paymentMethod, amount, { reservationId: reservation.id, stayId: null });
+  state.pendingCheckInAuthorization = authorization;
+  updateCheckInCardFeedback(`${authorization.id} authorized for ${formatPeso(amount)} on ${paymentMethod.brand} ${paymentMethod.maskedNumber}.`, paymentMethod.brand, "success");
+  addActivity("Card authorized", `${guestName(reservation)} - ${formatPeso(amount)} - ${authorization.id}`);
 });
 
 document.querySelector("#arrivalTabs").addEventListener("click", (event) => {
@@ -883,13 +1162,7 @@ elements.moduleWorkspace.addEventListener("click", (event) => {
   }
   if (event.target.dataset.viewFolio) openFolio(event.target.dataset.viewFolio);
   if (event.target.dataset.settleFolio) {
-    if (!canCashier()) return notify("Cashiering access is required.");
-    const stay = state.stays.find((item) => item.id === Number(event.target.dataset.settleFolio));
-    const balance = balanceFor(stay);
-    stay.folio.push({ type: "Payment", description: "Payment received", amount: -balance, reference: `PAY-${Date.now().toString().slice(-5)}` });
-    addActivity("Payment posted", `${stay.guest} - ${formatPeso(balance)}`);
-    renderAll();
-    notify(`${stay.guest}'s payment was posted to the ledger.`);
+    openPayment(event.target.dataset.settleFolio);
   }
   if (event.target.dataset.checkOut) {
     if (!permitted("departures")) return notify("Departure access is required.");
