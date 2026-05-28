@@ -4,17 +4,18 @@ const occupancyLabels = { vacant: "Vacant", assigned: "Assigned", occupied: "Occ
 const housekeepingLabels = { clean: "Clean", dirty: "Dirty", inspected: "Inspected", pickup: "Pickup" };
 const maintenanceLabels = { inService: "In Service", outOfService: "Out of Service", outOfOrder: "Out of Order" };
 const roleAccess = {
-  "Front Desk Agent": ["dashboard", "reservations", "rooms", "departures"],
-  "Front Desk Supervisor": ["dashboard", "reservations", "rooms", "departures", "housekeeping", "cashiering", "reports"],
-  "Cashier": ["dashboard", "cashiering", "departures"],
+  "Front Desk Agent": ["dashboard", "reservations", "rooms", "departures", "services"],
+  "Front Desk Supervisor": ["dashboard", "reservations", "rooms", "departures", "services", "housekeeping", "cashiering", "reports"],
+  "Cashier": ["dashboard", "cashiering", "departures", "services"],
   "Housekeeping Supervisor": ["housekeeping", "rooms"],
-  "Night Auditor": ["dashboard", "departures", "cashiering", "reports"]
+  "Night Auditor": ["dashboard", "departures", "cashiering", "services", "reports"]
 };
 const viewLabels = {
   dashboard: "Today's Front Desk Overview",
   reservations: "Reservations Management",
   rooms: "Rooms and Availability",
   departures: "Departures and Check-Out",
+  services: "Services and Add-On Charges",
   housekeeping: "Housekeeping Status",
   cashiering: "Cashiering and Folios",
   reports: "Operational Reports"
@@ -139,6 +140,7 @@ const elements = {
   roomModal: document.querySelector("#roomModal"),
   checkInModal: document.querySelector("#checkInModal"),
   folioModal: document.querySelector("#folioModal"),
+  postChargeModal: document.querySelector("#postChargeModal"),
   dashboardWorkspace: document.querySelector("#dashboardWorkspace"),
   moduleWorkspace: document.querySelector("#moduleWorkspace"),
   newReservationButton: document.querySelector("#newReservationButton"),
@@ -190,6 +192,10 @@ function canUpdateMaintenance() {
 
 function canCashier() {
   return permitted("cashiering");
+}
+
+function canPostServices() {
+  return permitted("services") || canCashier();
 }
 
 function roomRackClass(room) {
@@ -356,10 +362,32 @@ function renderCashieringWorkspace() {
       { label: "Due For Payment", value: stays.filter((stay) => balanceFor(stay) !== 0).length },
       { label: "Settled", value: stays.filter((stay) => balanceFor(stay) === 0).length }
     ])}
-    <article class="panel workspace-panel"><div class="panel-heading"><div><p class="eyebrow">In House Accounts</p><h3>Open Folios</h3></div></div>
+    <article class="panel workspace-panel"><div class="panel-heading"><div><p class="eyebrow">In House Accounts</p><h3>Open Folios</h3></div><button class="secondary-button" data-open-service-charge="true">Post Service Charge</button></div>
       <div class="workspace-table"><table><thead><tr><th>Guest</th><th>Room</th><th>Balance</th><th>Ledger</th><th></th></tr></thead><tbody>
         ${stays.map((stay) => `<tr><td>${stay.guest}</td><td>${stay.room}</td><td>${formatPeso(balanceFor(stay))}</td><td>${stay.folio.length} posting(s)</td>
-        <td><button class="row-action" data-view-folio="${stay.id}">View Ledger</button> ${balanceFor(stay) !== 0 ? `<button class="row-action" data-settle-folio="${stay.id}">Post Payment</button>` : '<span class="tag ready">Settled</span>'}</td></tr>`).join("")}
+        <td><button class="row-action" data-view-folio="${stay.id}">View Ledger</button> <button class="row-action" data-service-stay="${stay.id}">Post Charge</button> ${balanceFor(stay) !== 0 ? `<button class="row-action" data-settle-folio="${stay.id}">Post Payment</button>` : '<span class="tag ready">Settled</span>'}</td></tr>`).join("")}
+      </tbody></table></div>
+    </article>`;
+}
+
+function renderServicesWorkspace() {
+  const servicePostings = inHouseStays().flatMap((stay) => stay.folio
+    .filter((item) => item.source === "services")
+    .map((item) => ({ ...item, guest: stay.guest, room: stay.room })));
+  elements.moduleWorkspace.innerHTML = `
+    <article class="panel module-banner">
+      <div><p class="eyebrow">Guest Services</p><h3>Add-On Service Posting</h3></div>
+      <p>Post room-service, restaurant, laundry, minibar, spa, and other service charges directly to guest folios.</p>
+    </article>
+    ${moduleStats([
+      { label: "In-House Guests", value: inHouseStays().length },
+      { label: "Service Postings", value: servicePostings.length },
+      { label: "Service Total", value: formatPeso(servicePostings.reduce((sum, item) => sum + item.amount, 0)) }
+    ])}
+    <article class="panel workspace-panel">
+      <div class="panel-heading"><div><p class="eyebrow">Posting</p><h3>Charge Guest Services</h3></div><button class="primary-button" data-open-service-charge="true">Post Charge</button></div>
+      <div class="workspace-table"><table><thead><tr><th>Guest</th><th>Room</th><th>Category</th><th>Description</th><th>Reference</th><th>Amount</th></tr></thead><tbody>
+        ${servicePostings.map((item) => `<tr><td>${item.guest}</td><td>${item.room}</td><td>${item.category}</td><td>${item.description}</td><td>${item.reference}</td><td>${formatPeso(item.amount)}</td></tr>`).join("") || '<tr><td colspan="6">No service charges posted in this session.</td></tr>'}
       </tbody></table></div>
     </article>`;
 }
@@ -374,7 +402,7 @@ function renderReportsWorkspace() {
     ])}
     <article class="panel workspace-panel"><div class="panel-heading"><div><p class="eyebrow">Available Reports</p><h3>Daily Operations</h3></div></div>
       <div class="report-grid">
-        ${["Arrival Forecast", "Room State Summary", "Cashier Ledger", "Departure List"].map((report) => `<div class="report-tile"><strong>${report}</strong><p>Generated for the current business date.</p><button class="text-button" data-report="${report}">Generate Report</button></div>`).join("")}
+        ${["Arrival Forecast", "Room State Summary", "Cashier Ledger", "Services Summary", "Departure List"].map((report) => `<div class="report-tile"><strong>${report}</strong><p>Generated for the current business date.</p><button class="text-button" data-report="${report}">Generate Report</button></div>`).join("")}
       </div>
     </article>`;
 }
@@ -385,6 +413,7 @@ function renderModuleWorkspace() {
     reservations: renderReservationsWorkspace,
     rooms: renderRoomsWorkspace,
     departures: renderDeparturesWorkspace,
+    services: renderServicesWorkspace,
     housekeeping: renderHousekeepingWorkspace,
     cashiering: renderCashieringWorkspace,
     reports: renderReportsWorkspace
@@ -547,6 +576,24 @@ function openFolio(stayId) {
   elements.folioModal.showModal();
 }
 
+function populateServiceStaySelect(selectedStayId = "") {
+  const select = document.querySelector("#serviceStaySelect");
+  select.innerHTML = inHouseStays().map((stay) => `
+    <option value="${stay.id}" ${String(stay.id) === String(selectedStayId) ? "selected" : ""}>${stay.guest} - Room ${stay.room}</option>
+  `).join("");
+}
+
+function openPostCharge(stayId = "") {
+  if (!canPostServices()) {
+    notify("Service charge posting is not assigned to this role.");
+    return;
+  }
+  populateServiceStaySelect(stayId);
+  document.querySelector("#postChargeForm").reset();
+  populateServiceStaySelect(stayId);
+  elements.postChargeModal.showModal();
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({
     "&": "&amp;",
@@ -677,6 +724,15 @@ function printReport(report) {
       stays.map((stay) => [stay.guest, stay.room, String(stay.folio.length), formatPeso(balanceFor(stay))])
     ) + `<div class="total"><span>Total Outstanding</span><span>${escapeHtml(formatPeso(stays.reduce((sum, stay) => sum + balanceFor(stay), 0)))}</span></div>`;
   }
+  if (report === "Services Summary") {
+    const postings = inHouseStays().flatMap((stay) => stay.folio
+      .filter((item) => item.source === "services")
+      .map((item) => ({ ...item, guest: stay.guest, room: stay.room })));
+    body = printTable(
+      ["Guest", "Room", "Category", "Description", "Reference", "Amount"],
+      postings.map((item) => [item.guest, item.room, item.category, item.description, item.reference, formatPeso(item.amount)])
+    ) + `<div class="total"><span>Service Total</span><span>${escapeHtml(formatPeso(postings.reduce((sum, item) => sum + item.amount, 0)))}</span></div>`;
+  }
   if (report === "Departure List") {
     body = printTable(
       ["Guest", "Room", "Departure", "Balance", "Ready For Check-Out"],
@@ -730,6 +786,38 @@ document.querySelector("#reservationForm").addEventListener("submit", (event) =>
   notify(`Reservation ${reservation.confirmation} saved.`);
 });
 
+document.querySelector("#postChargeForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!canPostServices()) return notify("Service charge posting is not assigned to this role.");
+  if (!event.target.reportValidity()) return;
+  const values = new FormData(event.target);
+  const stay = state.stays.find((item) => item.id === Number(values.get("stayId")));
+  if (!stay || stay.status !== "in-house") return notify("Select an active in-house guest.");
+  const quantity = Number(values.get("quantity"));
+  const unitPrice = Number(values.get("unitPrice"));
+  const taxAmount = Number(values.get("taxAmount") || 0);
+  const amount = (quantity * unitPrice) + taxAmount;
+  if (amount <= 0) return notify("Charge amount must be greater than zero.");
+  const category = values.get("category");
+  const reference = values.get("reference").trim() || `SVC-${Date.now().toString().slice(-5)}`;
+  stay.folio.push({
+    type: "Service Charge",
+    source: "services",
+    category,
+    description: `${category}: ${values.get("description").trim()} x${quantity}`,
+    amount,
+    reference,
+    notes: values.get("notes").trim(),
+    operator: state.session.user,
+    shift: state.session.shift
+  });
+  addActivity("Service charge posted", `${stay.guest} / Room ${stay.room} - ${category} - ${formatPeso(amount)}`);
+  elements.postChargeModal.close();
+  event.target.reset();
+  renderAll();
+  notify(`${formatPeso(amount)} posted to ${stay.guest}'s folio.`);
+});
+
 document.querySelector("#checkInForm").addEventListener("submit", (event) => {
   event.preventDefault();
   if (event.target.reportValidity()) completeCheckIn();
@@ -780,6 +868,8 @@ elements.inHouseGuests.addEventListener("click", (event) => {
 });
 
 elements.moduleWorkspace.addEventListener("click", (event) => {
+  if (event.target.dataset.openServiceCharge) openPostCharge();
+  if (event.target.dataset.serviceStay) openPostCharge(event.target.dataset.serviceStay);
   if (event.target.dataset.reservationDetail) openReservationDetail(event.target.dataset.reservationDetail);
   if (event.target.dataset.moduleArrival) beginArrivalAction(event.target.dataset.moduleArrival);
   if (event.target.dataset.openRoom) openRoom(event.target.dataset.openRoom);

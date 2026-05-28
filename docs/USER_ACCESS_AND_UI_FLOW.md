@@ -15,19 +15,20 @@
 | Reservations | Capture reservation details, view active reservations, assign rooms, and initiate check-in. |
 | Room Rack | View room inventory and separate occupancy, housekeeping, and maintenance conditions. |
 | Departures | Review in-house stays due for departure and complete check-out after folio settlement. |
+| Services | Post add-on hotel service charges to active guest folios. |
 | Housekeeping | Review room service queue and update housekeeping readiness. |
 | Cashiering | Review folio transaction ledgers and post settlement payments. |
 | Reports | Review operational reporting options for the active business date. |
 
 ## User Roles and Tab Access
 
-| Role | Front Desk | Reservations | Room Rack | Departures | Housekeeping | Cashiering | Reports |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Front Desk Agent | Yes | Yes | Yes | Yes | No | No | No |
-| Front Desk Supervisor | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Cashier | Yes | No | No | Yes | No | Yes | No |
-| Housekeeping Supervisor | No | No | Yes | No | Yes | No | No |
-| Night Auditor | Yes | No | No | Yes | No | Yes | Yes |
+| Role | Front Desk | Reservations | Room Rack | Departures | Services | Housekeeping | Cashiering | Reports |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Front Desk Agent | Yes | Yes | Yes | Yes | Yes | No | No | No |
+| Front Desk Supervisor | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Cashier | Yes | No | No | Yes | Yes | No | Yes | No |
+| Housekeeping Supervisor | No | No | Yes | No | No | Yes | No | No |
+| Night Auditor | Yes | No | No | Yes | Yes | No | Yes | Yes |
 
 ## Permission Summary by Role
 
@@ -64,6 +65,7 @@
 - Can view Room Rack operational conditions.
 - Can view in-house folios from the Front Desk overview.
 - Can process check-out only when the folio balance is zero.
+- Can post basic add-on service charges to active guest folios.
 - Cannot post folio payments.
 - Cannot certify housekeeping status changes.
 - Cannot set a room out of service or out of order.
@@ -75,6 +77,7 @@
 - Can perform every Front Desk Agent workflow.
 - Can access and supervise Housekeeping status workflows.
 - Can access Cashiering settlement workflows.
+- Can access Services and post add-on charges.
 - Can access Reports.
 - Can update housekeeping condition of rooms.
 - Can update maintenance availability:
@@ -93,6 +96,7 @@
 - Can view Front Desk summary information relevant to active operations.
 - Can access Departures to identify guests requiring settlement prior to check-out.
 - Can access Cashiering.
+- Can access Services and post add-on charges.
 - Can open a guest folio transaction ledger.
 - Can post a payment transaction to settle an open balance.
 - Can support completion of departure once the folio is settled.
@@ -122,6 +126,7 @@
 - Can view Front Desk status.
 - Can access Departures.
 - Can access Cashiering.
+- Can access Services and post add-on charges.
 - Can access Reports.
 - Can inspect unsettled folios and post settlement payments in the current prototype.
 - Can review operational reports tied to the current business date.
@@ -298,6 +303,42 @@
   - Cash drawer or cashier session.
   - Refunds, adjustments, voids, and approval requirements.
 
+## Services / Add-On Charge Flow
+
+- Services is a lightweight charge-posting workflow, not a full restaurant POS.
+- Intended for hotel add-on services that should appear on the guest folio, such as:
+  - Restaurant.
+  - Room Service.
+  - Minibar.
+  - Laundry.
+  - Spa.
+  - Transportation.
+  - Business Center.
+  - Miscellaneous charges.
+- Accessible in the current prototype to:
+  - Front Desk Agent.
+  - Front Desk Supervisor.
+  - Cashier.
+  - Night Auditor.
+- User selects an active in-house guest / room.
+- User captures:
+  - Service category.
+  - Description.
+  - Quantity.
+  - Unit price in Philippine Peso.
+  - Optional service charge or tax amount.
+  - POS check number, manual reference, or generated service reference.
+  - Posting notes.
+- System calculates:
+  - `quantity x unit price + service charge/tax`.
+- On posting:
+  - A `Service Charge` transaction is appended to the selected guest folio.
+  - Folio balance recalculates immediately.
+  - The charge appears in the printable guest folio.
+  - The posting appears in the Services workspace list.
+  - Activity log records the category, amount, guest, room, operator, and shift.
+- Future production version may replace or supplement this with POS integration, where restaurant or outlet systems post approved room charges directly to the PMS folio.
+
 ## Departure and Check-Out Flow
 
 - Departures tab identifies in-house guests and displays:
@@ -380,12 +421,14 @@
   - Arrival Forecast.
   - Room State Summary.
   - Cashier Ledger.
+  - Services Summary.
   - Departure List.
 - Selecting a report opens a print-formatted browser document and invokes the browser print dialog.
 - Printable reports contain only records available in the current browser session:
   - Arrival Forecast lists current active reservations and room assignment status.
   - Room State Summary lists occupancy, housekeeping, and maintenance status by room.
   - Cashier Ledger summarizes open in-house folios and outstanding balance totals.
+  - Services Summary lists service charges posted during the current browser session.
   - Departure List identifies in-house guests, balances, and readiness for check-out.
 - Printing actions are reflected in the current shift activity log.
 - The UI does not yet save report copies, assign official report numbers, or archive printed output.
@@ -424,6 +467,7 @@
 - Permissions are enforced in the UI only; a production API must enforce authorization.
 - Folio workflow presently supports sample charges and settlement payments only.
 - No cancellation, no-show, room move, upgrade, deposit processing, adjustment, refund, group block, or night-audit rollover workflow is included yet.
+- Services posting is manual and does not integrate with a restaurant POS yet.
 - Printable reports and folios are created from browser-session data only and are not generated from persisted records or archived.
 
 ## Recommended SQLite Transition Scope
@@ -436,6 +480,7 @@
   - Rooms and room-state history.
   - Stays.
   - Folio transactions.
+  - Service charge source/category metadata.
   - Audit events.
   - Business-date configuration.
 - Enforce role permissions in Node.js API routes rather than relying on visible tab access alone.

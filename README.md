@@ -44,6 +44,7 @@ The existing navy and gold screen remains usable before Tailwind is built. Tailw
 - In-house folio ledger with charge/payment postings and calculated balances
 - Expanded reservation capture and presentation for split guest name, ID document, stay dates, occupants, rates, guarantee, contact, and notes
 - Browser-printable reservation confirmations, guest folios, arrival forecasts, room state summaries, cashier ledgers, and departure lists
+- Services / Post Charge workflow for restaurant, room service, minibar, laundry, spa, transport, and miscellaneous add-ons
 - Guest/confirmation/room quick lookup
 - Shift activity feed
 

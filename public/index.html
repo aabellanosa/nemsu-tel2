@@ -37,9 +37,10 @@
           <button class="nav-item" data-view="reservations"><span>02</span> Reservations</button>
           <button class="nav-item" data-view="rooms"><span>03</span> Room Rack</button>
           <button class="nav-item" data-view="departures"><span>04</span> Departures</button>
-          <button class="nav-item" data-view="housekeeping"><span>05</span> Housekeeping</button>
-          <button class="nav-item" data-view="cashiering"><span>06</span> Cashiering</button>
-          <button class="nav-item" data-view="reports"><span>07</span> Reports</button>
+          <button class="nav-item" data-view="services"><span>05</span> Services</button>
+          <button class="nav-item" data-view="housekeeping"><span>06</span> Housekeeping</button>
+          <button class="nav-item" data-view="cashiering"><span>07</span> Cashiering</button>
+          <button class="nav-item" data-view="reports"><span>08</span> Reports</button>
         </nav>
         <section class="sidebar-card">
           <p class="eyebrow">Quick Find</p>
@@ -319,6 +320,47 @@
         <div class="modal-actions">
           <button class="secondary-button" type="button" data-close="folioModal">Close</button>
           <button class="primary-button" id="printFolioButton" type="button">Print Folio</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="postChargeModal" class="modal">
+      <form id="postChargeForm">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Services</p>
+            <h2>Post Add-On Charge</h2>
+          </div>
+          <button class="close-button" type="button" data-close="postChargeModal" aria-label="Close">&times;</button>
+        </div>
+        <div class="form-grid">
+          <label>Guest / Room
+            <select name="stayId" id="serviceStaySelect" required></select>
+          </label>
+          <label>Service category
+            <select name="category" required>
+              <option>Restaurant</option>
+              <option>Room Service</option>
+              <option>Minibar</option>
+              <option>Laundry</option>
+              <option>Spa</option>
+              <option>Transportation</option>
+              <option>Business Center</option>
+              <option>Miscellaneous</option>
+            </select>
+          </label>
+          <label>Description<input name="description" required placeholder="Breakfast in bed, laundry, airport transfer..."></label>
+          <label>Reference / Check No.<input name="reference" placeholder="POS check or manual reference"></label>
+          <label>Quantity<input name="quantity" type="number" min="1" value="1" required></label>
+          <label>Unit price (PHP)<input name="unitPrice" type="number" min="0" step="0.01" value="0" required></label>
+          <label>Service charge / tax (PHP)<input name="taxAmount" type="number" min="0" step="0.01" value="0"></label>
+        </div>
+        <label class="handover-notes">Posting notes
+          <textarea name="notes" rows="2" placeholder="Outlet, staff note, guest instruction..."></textarea>
+        </label>
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" data-close="postChargeModal">Cancel</button>
+          <button class="primary-button" type="submit">Post to Folio</button>
         </div>
       </form>
     </dialog>
