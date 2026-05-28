@@ -16,6 +16,7 @@
   --amber: #b97819;
   --amber-bg: #fff1d9;
   --shadow: 0 5px 22px rgba(16, 42, 67, 0.06);
+  --topbar-height: 76px;
 }
 
 * {
@@ -47,6 +48,12 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 80;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .brand,
@@ -58,6 +65,26 @@ button {
 
 .brand {
   gap: 16px;
+}
+
+.menu-button {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #314c63;
+  border-radius: 3px;
+  background: #0d2437;
+  color: white;
+  place-items: center;
+  padding: 9px;
+}
+
+.menu-button span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  margin: 3px auto;
+  background: white;
 }
 
 .brand-mark {
@@ -146,7 +173,8 @@ button {
 }
 
 .app-shell {
-  min-height: calc(100vh - 76px);
+  min-height: 100vh;
+  padding-top: var(--topbar-height);
   display: flex;
 }
 
@@ -157,6 +185,11 @@ button {
   padding: 27px 18px 22px;
   display: flex;
   flex-direction: column;
+}
+
+.drawer-close,
+.sidebar-overlay {
+  display: none;
 }
 
 .nav-item {
@@ -964,13 +997,22 @@ td:first-child {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 769px) {
   .topbar {
     height: auto;
     padding: 16px;
     gap: 16px;
-    flex-direction: column;
+    flex-direction: row;
     align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .brand {
+    width: 100%;
+  }
+
+  .menu-button {
+    display: inline-grid;
   }
 
   .property-meta {
@@ -979,7 +1021,53 @@ td:first-child {
   }
 
   .sidebar {
-    display: none;
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(286px, 86vw);
+    z-index: 120;
+    padding-top: 62px;
+    transform: translateX(-102%);
+    transition: transform 180ms ease;
+    box-shadow: 18px 0 42px rgba(4, 18, 28, 0.34);
+    overflow-y: auto;
+  }
+
+  body.sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .drawer-close {
+    display: grid;
+    place-items: center;
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #314c63;
+    border-radius: 3px;
+    background: #0d2437;
+    color: white;
+    font-size: 25px;
+  }
+
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 110;
+    background: rgba(4, 18, 28, 0.48);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+  }
+
+  body.sidebar-open .sidebar-overlay {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .main-content {

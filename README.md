@@ -46,6 +46,7 @@ The existing navy and gold screen remains usable before Tailwind is built. Tailw
 - Browser-printable reservation confirmations, guest folios, arrival forecasts, room state summaries, cashier ledgers, and departure lists
 - Services / Post Charge workflow for restaurant, room service, minibar, laundry, spa, transport, and miscellaneous add-ons
 - Mock credit-card validation, check-in authorization, and cashiering capture flow with masked card display
+- Sticky operator topbar and responsive hamburger drawer navigation for narrow screens
 - Guest/confirmation/room quick lookup
 - Shift activity feed
 

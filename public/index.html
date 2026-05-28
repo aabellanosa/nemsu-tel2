@@ -10,6 +10,9 @@
   <body>
     <header class="topbar">
       <div class="brand">
+        <button class="menu-button" id="menuButton" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
         <div class="brand-mark">NH</div>
         <div>
           <p class="eyebrow">Nemsu-Tagbina Mini Hostel</p>
@@ -31,7 +34,9 @@
     </header>
 
     <div class="app-shell">
-      <aside class="sidebar" aria-label="Main navigation">
+      <div class="sidebar-overlay" id="sidebarOverlay"></div>
+      <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+        <button class="drawer-close" id="drawerCloseButton" type="button" aria-label="Close navigation">&times;</button>
         <nav id="navigation">
           <button class="nav-item active" data-view="dashboard"><span>01</span> Front Desk</button>
           <button class="nav-item" data-view="reservations"><span>02</span> Reservations</button>

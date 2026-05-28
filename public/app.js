@@ -202,8 +202,16 @@ const elements = {
   newReservationButton: document.querySelector("#newReservationButton"),
   assignRoomButton: document.querySelector("#assignRoomButton"),
   handoverModal: document.querySelector("#handoverModal"),
-  loginModal: document.querySelector("#loginModal")
+  loginModal: document.querySelector("#loginModal"),
+  menuButton: document.querySelector("#menuButton"),
+  drawerCloseButton: document.querySelector("#drawerCloseButton"),
+  sidebarOverlay: document.querySelector("#sidebarOverlay")
 };
+
+function syncTopbarOffset() {
+  const topbar = document.querySelector(".topbar");
+  document.documentElement.style.setProperty("--topbar-height", `${topbar.offsetHeight}px`);
+}
 
 document.querySelector("#businessDate").textContent = today.toLocaleDateString("en-PH", {
   weekday: "short", month: "short", day: "numeric", year: "numeric"
@@ -498,6 +506,11 @@ function notify(message) {
   toastTimer = setTimeout(() => elements.toast.classList.remove("visible"), 2700);
 }
 
+function setSidebarOpen(open) {
+  document.body.classList.toggle("sidebar-open", open);
+  elements.menuButton.setAttribute("aria-expanded", String(open));
+}
+
 function renderSession() {
   document.querySelector("#activeOperator").textContent = state.session.signedIn ? state.session.user : "Signed Out";
   document.querySelector("#activeRole").textContent = state.session.signedIn ? state.session.role : "No active role";
@@ -513,6 +526,7 @@ function renderSession() {
   elements.newReservationButton.classList.toggle("hidden", !hasFrontDeskAccess());
   elements.assignRoomButton.classList.toggle("hidden", !hasFrontDeskAccess());
   renderAll();
+  syncTopbarOffset();
 }
 
 function assignAvailableRoom(reservation) {
@@ -1199,7 +1213,16 @@ document.querySelector("#navigation").addEventListener("click", (event) => {
   if (!selected || !permitted(selected.dataset.view)) return;
   state.activeView = selected.dataset.view;
   renderSession();
+  setSidebarOpen(false);
 });
+
+elements.menuButton.addEventListener("click", () => setSidebarOpen(!document.body.classList.contains("sidebar-open")));
+elements.drawerCloseButton.addEventListener("click", () => setSidebarOpen(false));
+elements.sidebarOverlay.addEventListener("click", () => setSidebarOpen(false));
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") setSidebarOpen(false);
+});
+window.addEventListener("resize", syncTopbarOffset);
 
 document.querySelector("#changeShiftButton").addEventListener("click", () => {
   if (!state.session.signedIn) return;
@@ -1250,3 +1273,4 @@ elements.loginModal.addEventListener("cancel", (event) => {
 });
 
 renderSession();
+syncTopbarOffset();
