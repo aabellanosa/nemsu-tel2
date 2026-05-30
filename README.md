@@ -6,6 +6,27 @@ A Micros-Fidelio-inspired hotel property management UI prototype built with a de
 
 - [User Access and UI Flow](docs/USER_ACCESS_AND_UI_FLOW.md) defines roles, allowed tabs, operational permissions, reservation/check-in/cashiering/departure flow, shift handover, and the planned persistence boundary.
 
+## Browser Support
+
+This prototype is designed for modern browsers and tested/targeted for current desktop and tablet usage. Legacy mobile Safari is not an operational target.
+
+Target browsers:
+
+- Chrome 120+
+- Microsoft Edge 120+
+- Firefox 120+
+- Safari 17+
+- iOS Safari 15.4+
+- Chrome on iOS 15.4+
+- Android Chrome 120+
+
+Minimum expected support:
+
+- iOS Safari 13+
+- Modern Chromium-based browsers
+
+Older iOS versions may display the page but are not guaranteed to support all interactive workflows.
+
 ## Run
 
 ```powershell

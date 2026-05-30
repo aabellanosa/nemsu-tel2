@@ -1,5 +1,5 @@
 const today = new Date();
-const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+const dateKey = formatDateKey(today);
 const occupancyLabels = { vacant: "Vacant", assigned: "Assigned", occupied: "Occupied" };
 const housekeepingLabels = { clean: "Clean", dirty: "Dirty", inspected: "Inspected", pickup: "Pickup" };
 const maintenanceLabels = { inService: "In Service", outOfService: "Out of Service", outOfOrder: "Out of Order" };
@@ -21,10 +21,18 @@ const viewLabels = {
   reports: "Operational Reports"
 };
 
+function twoDigit(value) {
+  return value < 10 ? `0${value}` : String(value);
+}
+
+function formatDateKey(value) {
+  return `${value.getFullYear()}-${twoDigit(value.getMonth() + 1)}-${twoDigit(value.getDate())}`;
+}
+
 function offsetDate(days) {
   const value = new Date(today);
   value.setDate(value.getDate() + days);
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+  return formatDateKey(value);
 }
 
 function formatDate(value) {
@@ -216,6 +224,28 @@ function syncTopbarOffset() {
 document.querySelector("#businessDate").textContent = today.toLocaleDateString("en-PH", {
   weekday: "short", month: "short", day: "numeric", year: "numeric"
 });
+
+function openModal(modal) {
+  if (modal.showModal) {
+    modal.showModal();
+    return;
+  }
+  modal.setAttribute("open", "");
+  modal.classList.add("modal-fallback-open");
+  document.body.classList.add("modal-fallback-active");
+}
+
+function closeModal(modal) {
+  if (modal.close) {
+    modal.close();
+  } else {
+    modal.removeAttribute("open");
+  }
+  modal.classList.remove("modal-fallback-open");
+  if (!document.querySelector(".modal.modal-fallback-open")) {
+    document.body.classList.remove("modal-fallback-active");
+  }
+}
 
 function dueInReservations() {
   return state.reservations.filter((reservation) => reservation.status === "due-in" && reservation.arrivalDate === dateKey);
@@ -439,9 +469,12 @@ function renderCashieringWorkspace() {
 }
 
 function renderServicesWorkspace() {
-  const servicePostings = inHouseStays().flatMap((stay) => stay.folio
-    .filter((item) => item.source === "services")
-    .map((item) => ({ ...item, guest: stay.guest, room: stay.room })));
+  const servicePostings = [];
+  inHouseStays().forEach((stay) => {
+    stay.folio.filter((item) => item.source === "services").forEach((item) => {
+      servicePostings.push(Object.assign({}, item, { guest: stay.guest, room: stay.room }));
+    });
+  });
   elements.moduleWorkspace.innerHTML = `
     <article class="panel module-banner">
       <div><p class="eyebrow">Guest Services</p><h3>Add-On Service Posting</h3></div>
@@ -567,7 +600,7 @@ function openReservationDetail(id) {
     <div class="detail-cell"><span>ID Number</span>${reservation.idNumber}</div>
     <div class="detail-cell"><span>Contact</span>${reservation.phone || "No phone"}<br>${reservation.email || "No email"}</div>
     <div class="detail-cell full"><span>Notes / Preferences</span>${reservation.notes || "None recorded"}</div>`;
-  elements.reservationDetailModal.showModal();
+  openModal(elements.reservationDetailModal);
 }
 
 function beginArrivalAction(id) {
@@ -605,7 +638,7 @@ function beginArrivalAction(id) {
   updateCheckInCardFeedback("Card authorization is optional for this prototype.", "No Card");
   document.querySelector("#checkInIdentity").checked = false;
   document.querySelector("#checkInRoomReady").checked = false;
-  elements.checkInModal.showModal();
+  openModal(elements.checkInModal);
 }
 
 function completeCheckIn() {
@@ -639,7 +672,7 @@ function completeCheckIn() {
   }
   state.pendingCheckInAuthorization = null;
   addActivity(`${guestName(reservation)} checked in`, `Room ${reservation.room} | ${document.querySelector("#checkInKeys").value} key(s) issued`);
-  elements.checkInModal.close();
+  closeModal(elements.checkInModal);
   renderAll();
   notify(`Check-in completed for ${guestName(reservation)}.`);
 }
@@ -656,7 +689,7 @@ function openRoom(number) {
   document.querySelector("#roomHousekeepingSelect").disabled = !canUpdateHousekeeping();
   document.querySelector("#roomMaintenanceSelect").disabled = !canUpdateMaintenance();
   document.querySelector("#updateRoomStatusButton").classList.toggle("hidden", !canUpdateHousekeeping() && !canUpdateMaintenance());
-  elements.roomModal.showModal();
+  openModal(elements.roomModal);
 }
 
 function openFolio(stayId) {
@@ -669,7 +702,7 @@ function openFolio(stayId) {
     <table><thead><tr><th>Type</th><th>Description</th><th>Reference</th><th>Amount</th></tr></thead>
     <tbody>${stay.folio.map((item) => `<tr><td>${item.type}</td><td>${item.description}</td><td>${item.reference}</td><td>${formatPeso(item.amount)}</td></tr>`).join("")}</tbody></table>
     <div class="ledger-total"><span>Balance Due</span><span>${formatPeso(balanceFor(stay))}</span></div>`;
-  elements.folioModal.showModal();
+  openModal(elements.folioModal);
 }
 
 function authorizationsForStay(stayId) {
@@ -684,7 +717,7 @@ function createMockPaymentMethod({ cardholder, number, expiryMonth, expiryYear }
     brand,
     maskedNumber: maskCard(number),
     cardholder: cardholder.trim(),
-    expiryMonth: String(expiryMonth).padStart(2, "0"),
+    expiryMonth: twoDigit(Number(expiryMonth)),
     expiryYear: String(expiryYear),
     token: `tok_mock_${Date.now().toString(36)}`,
     ...links
@@ -727,7 +760,7 @@ function openPostCharge(stayId = "") {
   populateServiceStaySelect(stayId);
   document.querySelector("#postChargeForm").reset();
   populateServiceStaySelect(stayId);
-  elements.postChargeModal.showModal();
+  openModal(elements.postChargeModal);
 }
 
 function openPayment(stayId) {
@@ -755,7 +788,7 @@ function openPayment(stayId) {
   } else {
     updatePaymentCardFeedback("Use an existing authorization or enter a mock card.", "No Card");
   }
-  elements.paymentModal.showModal();
+  openModal(elements.paymentModal);
 }
 
 function populateAuthorizationSelect(stayId) {
@@ -784,7 +817,7 @@ function updatePaymentCardFeedback(message, brand, status = "") {
 }
 
 function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+  return String(value == null ? "" : value).replace(/[&<>"']/g, (character) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
@@ -914,9 +947,12 @@ function printReport(report) {
     ) + `<div class="total"><span>Total Outstanding</span><span>${escapeHtml(formatPeso(stays.reduce((sum, stay) => sum + balanceFor(stay), 0)))}</span></div>`;
   }
   if (report === "Services Summary") {
-    const postings = inHouseStays().flatMap((stay) => stay.folio
-      .filter((item) => item.source === "services")
-      .map((item) => ({ ...item, guest: stay.guest, room: stay.room })));
+    const postings = [];
+    inHouseStays().forEach((stay) => {
+      stay.folio.filter((item) => item.source === "services").forEach((item) => {
+        postings.push(Object.assign({}, item, { guest: stay.guest, room: stay.room }));
+      });
+    });
     body = printTable(
       ["Guest", "Room", "Category", "Description", "Reference", "Amount"],
       postings.map((item) => [item.guest, item.room, item.category, item.description, item.reference, formatPeso(item.amount)])
@@ -934,7 +970,7 @@ function printReport(report) {
 }
 
 document.querySelectorAll("[data-close]").forEach((button) => {
-  button.addEventListener("click", () => document.querySelector(`#${button.dataset.close}`).close());
+  button.addEventListener("click", () => closeModal(document.querySelector(`#${button.dataset.close}`)));
 });
 
 document.querySelector("#printReservationButton").addEventListener("click", printReservation);
@@ -944,7 +980,7 @@ elements.newReservationButton.addEventListener("click", () => {
   if (!hasFrontDeskAccess()) return notify("Reservation access is not assigned to this role.");
   document.querySelector('[name="arrivalDate"]').value = dateKey;
   document.querySelector('[name="departureDate"]').value = offsetDate(1);
-  elements.reservationModal.showModal();
+  openModal(elements.reservationModal);
 });
 
 document.querySelector("#reservationForm").addEventListener("submit", (event) => {
@@ -970,7 +1006,7 @@ document.querySelector("#reservationForm").addEventListener("submit", (event) =>
   state.reservations.push(reservation);
   addActivity("Reservation created", `${guestName(reservation)} - ${reservation.confirmation}`);
   event.target.reset();
-  elements.reservationModal.close();
+  closeModal(elements.reservationModal);
   renderAll();
   notify(`Reservation ${reservation.confirmation} saved.`);
 });
@@ -1001,7 +1037,7 @@ document.querySelector("#postChargeForm").addEventListener("submit", (event) => 
     shift: state.session.shift
   });
   addActivity("Service charge posted", `${stay.guest} / Room ${stay.room} - ${category} - ${formatPeso(amount)}`);
-  elements.postChargeModal.close();
+  closeModal(elements.postChargeModal);
   event.target.reset();
   renderAll();
   notify(`${formatPeso(amount)} posted to ${stay.guest}'s folio.`);
@@ -1077,7 +1113,7 @@ document.querySelector("#paymentForm").addEventListener("submit", (event) => {
     }
   }
   stay.folio.push({ type: "Payment", source, description, amount: -amount, reference });
-  elements.paymentModal.close();
+  closeModal(elements.paymentModal);
   event.target.reset();
   renderAll();
   notify(`${formatPeso(amount)} payment posted to ${stay.guest}'s folio.`);
@@ -1139,7 +1175,7 @@ document.querySelector("#roomForm").addEventListener("submit", (event) => {
   if (canUpdateHousekeeping()) room.housekeeping = document.querySelector("#roomHousekeepingSelect").value;
   if (canUpdateMaintenance()) room.maintenance = document.querySelector("#roomMaintenanceSelect").value;
   addActivity(`Room ${room.number} status updated`, `${housekeepingLabels[room.housekeeping]} / ${maintenanceLabels[room.maintenance]}`);
-  elements.roomModal.close();
+  closeModal(elements.roomModal);
   renderAll();
   notify(`Operations status updated for room ${room.number}.`);
 });
@@ -1231,7 +1267,7 @@ document.querySelector("#changeShiftButton").addEventListener("click", () => {
     Active shift: <strong>${state.session.shift}</strong><br>
     Items to hand over: <strong>${dueInReservations().filter((reservation) => !reservation.room).length} unassigned arrivals</strong> and
     <strong>${inHouseStays().filter((stay) => balanceFor(stay) !== 0).length} unsettled folios</strong>`;
-  elements.handoverModal.showModal();
+  openModal(elements.handoverModal);
 });
 
 document.querySelector("#handoverForm").addEventListener("submit", (event) => {
@@ -1243,7 +1279,7 @@ document.querySelector("#handoverForm").addEventListener("submit", (event) => {
   state.handovers.unshift({ outgoing, incoming: { user, role, shift: values.get("incomingShift") }, notes: values.get("notes") });
   state.session = { user, role, shift: values.get("incomingShift"), signedIn: true };
   addActivity("Shift handover completed", `${outgoing.user} transferred duty to ${user}.`, `${outgoing.user} | ${outgoing.shift}`);
-  elements.handoverModal.close();
+  closeModal(elements.handoverModal);
   event.target.reset();
   renderSession();
   notify(`${state.session.shift} shift opened for ${state.session.user}.`);
@@ -1254,7 +1290,7 @@ document.querySelector("#signOutButton").addEventListener("click", () => {
   addActivity("Operator signed out", `${state.session.user} closed access to this workstation.`);
   state.session.signedIn = false;
   renderSession();
-  elements.loginModal.showModal();
+  openModal(elements.loginModal);
 });
 
 document.querySelector("#loginForm").addEventListener("submit", (event) => {
@@ -1263,7 +1299,7 @@ document.querySelector("#loginForm").addEventListener("submit", (event) => {
   const [user, role] = values.get("loginUser").split("|");
   state.session = { user, role, shift: values.get("loginShift"), signedIn: true };
   addActivity("Operator signed in", `${user} opened the ${state.session.shift} workspace.`);
-  elements.loginModal.close();
+  closeModal(elements.loginModal);
   renderSession();
   notify(`Welcome, ${user}. ${role} access enabled.`);
 });

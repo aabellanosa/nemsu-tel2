@@ -7,6 +7,27 @@
 - In the current prototype, records remain available only during the open browser session and reset after page refresh.
 - For production deployment, these permissions must be enforced by the server and recorded in a permanent audit trail.
 
+## Browser and Device Support
+
+- This prototype is intended for modern browsers and current hotel workstation/tablet use.
+- Legacy mobile Safari is not an operational target.
+- Target browser versions:
+  - Chrome 120+.
+  - Microsoft Edge 120+.
+  - Firefox 120+.
+  - Safari 17+.
+  - iOS Safari 15.4+.
+  - Chrome on iOS 15.4+.
+  - Android Chrome 120+.
+- Minimum expected support:
+  - iOS Safari 13+.
+  - Modern Chromium-based browsers.
+- Older iOS versions may render the page but are not guaranteed to support all interactive workflows.
+- For actual hotel operations, recommended devices are:
+  - Desktop or laptop workstation for Front Desk, Cashiering, Night Audit, and Supervisor functions.
+  - Modern tablet for housekeeping review or light operational lookup.
+  - Phone-sized screens for demonstration or limited lookup only, not primary PMS operation.
+
 ## System Tabs
 
 | Tab | Main Purpose |
