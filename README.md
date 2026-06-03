@@ -5,6 +5,7 @@ A Micros-Fidelio-inspired hotel property management UI prototype built with a de
 ## Functional Documentation
 
 - [User Access and UI Flow](docs/USER_ACCESS_AND_UI_FLOW.md) defines roles, allowed tabs, operational permissions, reservation/check-in/cashiering/departure flow, shift handover, and the planned persistence boundary.
+- [Static Deployment to Namecheap](docs/DEPLOYMENT.md) explains the GitHub Actions deployment flow and required repository secrets.
 
 ## Browser Support
 

@@ -14,8 +14,13 @@ permissions:
 
 jobs:
   verify:
-    name: Verify static prototype
+    name: Verify and deploy static prototype
     runs-on: ubuntu-latest
+    env:
+      FTP_SERVER: ${{ secrets.NAMECHEAP_FTP_SERVER }}
+      FTP_USERNAME: ${{ secrets.NAMECHEAP_FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.NAMECHEAP_FTP_PASSWORD }}
+      FTP_SERVER_DIR: ${{ secrets.NAMECHEAP_FTP_SERVER_DIR }}
 
     steps:
       - name: Check out repository
@@ -38,3 +43,13 @@ jobs:
 
       - name: Check browser app syntax
         run: node --check public/app.js
+
+      - name: Deploy public folder to Namecheap
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.FTP_SERVER != '' && env.FTP_USERNAME != '' && env.FTP_PASSWORD != '' && env.FTP_SERVER_DIR != ''
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ env.FTP_SERVER }}
+          username: ${{ env.FTP_USERNAME }}
+          password: ${{ env.FTP_PASSWORD }}
+          local-dir: ./public/
+          server-dir: ${{ env.FTP_SERVER_DIR }}
