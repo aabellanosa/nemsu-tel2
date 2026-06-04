@@ -20,6 +20,43 @@ const viewLabels = {
   cashiering: "Cashiering and Folios",
   reports: "Operational Reports"
 };
+const nationalityOptions = {
+  Filipino: "🇵🇭 Filipino",
+  American: "🇺🇸 American",
+  Australian: "🇦🇺 Australian",
+  British: "🇬🇧 British",
+  Canadian: "🇨🇦 Canadian",
+  Chinese: "🇨🇳 Chinese",
+  French: "🇫🇷 French",
+  German: "🇩🇪 German",
+  Indian: "🇮🇳 Indian",
+  Indonesian: "🇮🇩 Indonesian",
+  Japanese: "🇯🇵 Japanese",
+  Korean: "🇰🇷 Korean",
+  Malaysian: "🇲🇾 Malaysian",
+  Singaporean: "🇸🇬 Singaporean",
+  Thai: "🇹🇭 Thai",
+  Vietnamese: "🇻🇳 Vietnamese",
+  Other: "🏳️ Other / Not listed"
+};
+const roomTypeCodes = {
+  "Standard Queen": "STD",
+  "Deluxe King": "DLX",
+  "Deluxe Twin": "DLX",
+  "Executive Suite": "STE"
+};
+const roomCodeLabels = {
+  STD: "Standard Queen",
+  DLX: "Deluxe",
+  STE: "Executive Suite"
+};
+const additionalBedRates = {
+  "Standard Queen": 700,
+  "Deluxe": 1000,
+  "Deluxe King": 1000,
+  "Deluxe Twin": 1000,
+  "Executive Suite": 1500
+};
 
 function twoDigit(value) {
   return value < 10 ? `0${value}` : String(value);
@@ -49,6 +86,22 @@ function nightsBetween(arrivalDate, departureDate) {
 
 function guestName(record) {
   return [record.guestFirstName, record.guestLastName].filter(Boolean).join(" ") || record.guest || "";
+}
+
+function nationalityLabel(value) {
+  return nationalityOptions[value] || value || "Not recorded";
+}
+
+function roomTypeForStay(stay) {
+  if (stay.roomType) return stay.roomType;
+  const reservation = state.reservations.find((item) => item.id === stay.reservationId);
+  if (reservation) return reservation.roomType;
+  const room = state.rooms.find((item) => item.number === stay.room);
+  return roomCodeLabels[room?.type] || "Standard Queen";
+}
+
+function additionalBedRateForStay(stay) {
+  return additionalBedRates[roomTypeForStay(stay)] || additionalBedRates["Standard Queen"];
 }
 
 function cleanCardNumber(value) {
@@ -118,28 +171,28 @@ const state = {
   reservations: [
     {
       id: 1, confirmation: "GH-28491", status: "due-in", guestProfileId: "GP-1001", guestFirstName: "Alicia", guestLastName: "Fernandez",
-      idType: "Passport", idNumber: "P1234567",
+      nationality: "Filipino", idType: "Passport", idNumber: "P1234567",
       phone: "+63 917 555 0131", email: "alicia@example.com", arrivalDate: dateKey, departureDate: offsetDate(2),
       eta: "12:30 PM", roomType: "Executive Suite", room: "402", adults: 2, children: 0, ratePlan: "BAR",
       nightlyRate: 7200, paymentMethod: "Credit Card Guarantee", notes: "High floor preferred.", vip: true
     },
     {
       id: 2, confirmation: "GH-28506", status: "due-in", guestProfileId: "GP-1002", guestFirstName: "Robert", guestLastName: "Delgado",
-      idType: "Driver's License", idNumber: "N01-23-456789",
+      nationality: "American", idType: "Driver's License", idNumber: "N01-23-456789",
       phone: "+63 917 555 0132", email: "", arrivalDate: dateKey, departureDate: offsetDate(1),
       eta: "2:00 PM", roomType: "Deluxe King", room: "318", adults: 1, children: 0, ratePlan: "CORP",
       nightlyRate: 4800, paymentMethod: "Direct Bill", notes: "", vip: false
     },
     {
       id: 3, confirmation: "GH-28524", status: "due-in", guestProfileId: "GP-1003", guestFirstName: "Maria", guestLastName: "Velasco",
-      idType: "National ID", idNumber: "1234-5678-9012",
+      nationality: "Filipino", idType: "National ID", idNumber: "1234-5678-9012",
       phone: "+63 917 555 0133", email: "maria@example.com", arrivalDate: dateKey, departureDate: offsetDate(3),
       eta: "3:15 PM", roomType: "Deluxe Twin", room: null, adults: 2, children: 1, ratePlan: "BAR",
       nightlyRate: 5250, paymentMethod: "Pay at Hostel", notes: "Late checkout requested.", vip: true
     },
     {
       id: 4, confirmation: "GH-28538", status: "due-in", guestProfileId: "GP-1004", guestFirstName: "James", guestLastName: "Wu",
-      idType: "Passport", idNumber: "E7654321",
+      nationality: "Singaporean", idType: "Passport", idNumber: "E7654321",
       phone: "", email: "", arrivalDate: dateKey, departureDate: offsetDate(1),
       eta: "5:30 PM", roomType: "Standard Queen", room: null, adults: 1, children: 0, ratePlan: "BAR",
       nightlyRate: 3900, paymentMethod: "Cash Deposit", notes: "", vip: false
@@ -165,22 +218,27 @@ const state = {
   stays: [
     {
       id: 501, reservationId: null, guest: "Daniel Reyes", room: "305", departureDate: dateKey, status: "in-house",
+      roomType: "Standard Queen",
       folio: [{ type: "Room Charge", description: "Accommodation", amount: 16500, reference: "POST-1001" }]
     },
     {
       id: 502, reservationId: null, guest: "Linda Park", room: "303", departureDate: dateKey, status: "in-house",
+      roomType: "Deluxe",
       folio: [{ type: "Room Charge", description: "Accommodation", amount: 4250, reference: "POST-1002" }]
     },
     {
       id: 503, reservationId: null, guest: "Ramon Cruz", room: "401", departureDate: offsetDate(1), status: "in-house",
+      roomType: "Deluxe",
       folio: [{ type: "Room Charge", description: "Accommodation", amount: 7800, reference: "POST-1003" }, { type: "Payment", description: "Card payment", amount: -7800, reference: "PAY-1001" }]
     },
     {
       id: 504, reservationId: null, guest: "Ana Romero", room: "202", departureDate: offsetDate(2), status: "in-house",
+      roomType: "Standard Queen",
       folio: [{ type: "Room Charge", description: "Accommodation", amount: 3900, reference: "POST-1004" }, { type: "Payment", description: "Cash deposit", amount: -3900, reference: "PAY-1002" }]
     },
     {
       id: 505, reservationId: null, guest: "Jose Rivera", room: "301", departureDate: offsetDate(1), status: "in-house",
+      roomType: "Standard Queen",
       folio: [{ type: "Room Charge", description: "Accommodation", amount: 3900, reference: "POST-1005" }]
     }
   ],
@@ -563,12 +621,6 @@ function renderSession() {
 }
 
 function assignAvailableRoom(reservation) {
-  const roomTypeCodes = {
-    "Standard Queen": "STD",
-    "Deluxe King": "DLX",
-    "Deluxe Twin": "DLX",
-    "Executive Suite": "STE"
-  };
   const requestedType = roomTypeCodes[reservation.roomType];
   const room = state.rooms.find((candidate) => candidate.type === requestedType && roomIsAssignable(candidate));
   if (!room) {
@@ -591,6 +643,7 @@ function openReservationDetail(id) {
     <div class="detail-cell"><span>Guest Profile</span>${reservation.guestProfileId}</div>
     <div class="detail-cell"><span>First Name</span>${reservation.guestFirstName}</div>
     <div class="detail-cell"><span>Last Name</span>${reservation.guestLastName}</div>
+    <div class="detail-cell"><span>Nationality</span>${nationalityLabel(reservation.nationality)}</div>
     <div class="detail-cell"><span>Stay Dates</span>${formatDate(reservation.arrivalDate)} - ${formatDate(reservation.departureDate)} (${nightsBetween(reservation.arrivalDate, reservation.departureDate)} night(s))</div>
     <div class="detail-cell"><span>Occupancy</span>${reservation.adults} adult(s), ${reservation.children} child(ren)</div>
     <div class="detail-cell"><span>Room</span>${reservation.roomType} / ${reservation.room || "Unassigned"}</div>
@@ -624,6 +677,7 @@ function beginArrivalAction(id) {
     Stay: ${formatDate(reservation.arrivalDate)} - ${formatDate(reservation.departureDate)} (${nightsBetween(reservation.arrivalDate, reservation.departureDate)} night(s))<br>
     Room: ${reservation.room} / ${reservation.roomType} | Rate: ${formatPeso(reservation.nightlyRate)} per night<br>
     Room Readiness: ${housekeepingLabels[room.housekeeping]} / ${maintenanceLabels[room.maintenance]}<br>
+    Nationality: ${nationalityLabel(reservation.nationality)}<br>
     ID: ${reservation.idType} / ${reservation.idNumber}<br>
     Notes: ${reservation.notes || "None recorded"}
   `;
@@ -655,6 +709,7 @@ function completeCheckIn() {
     reservationId: reservation.id,
     guest: guestName(reservation),
     room: reservation.room,
+    roomType: reservation.roomType,
     departureDate: reservation.departureDate,
     status: "in-house",
     folio: [{ type: "Room Charge", description: `${nightsBetween(reservation.arrivalDate, reservation.departureDate)} night accommodation`, amount: lodgingTotal, reference: `POST-${reservation.confirmation}` }]
@@ -752,14 +807,29 @@ function populateServiceStaySelect(selectedStayId = "") {
   `).join("");
 }
 
+function selectedServiceStay() {
+  return state.stays.find((item) => item.id === Number(document.querySelector("#serviceStaySelect").value));
+}
+
+function updateAdditionalBedDefaults() {
+  const category = document.querySelector("#serviceCategorySelect").value;
+  if (category !== "Additional Bed") return;
+  const stay = selectedServiceStay();
+  if (!stay) return;
+  const roomType = roomTypeForStay(stay);
+  document.querySelector('[name="description"]').value = `Additional bed - ${roomType} per night`;
+  document.querySelector("#serviceUnitPrice").value = additionalBedRateForStay(stay).toFixed(2);
+  document.querySelector('[name="quantity"]').value = "1";
+}
+
 function openPostCharge(stayId = "") {
   if (!canPostServices()) {
     notify("Service charge posting is not assigned to this role.");
     return;
   }
-  populateServiceStaySelect(stayId);
   document.querySelector("#postChargeForm").reset();
   populateServiceStaySelect(stayId);
+  updateAdditionalBedDefaults();
   openModal(elements.postChargeModal);
 }
 
@@ -884,6 +954,7 @@ function printReservation() {
     ["Guest First Name", reservation.guestFirstName],
     ["Guest Last Name", reservation.guestLastName],
     ["Guest Profile", reservation.guestProfileId],
+    ["Nationality", nationalityLabel(reservation.nationality)],
     ["Arrival", formatDate(reservation.arrivalDate)],
     ["Departure", formatDate(reservation.departureDate)],
     ["Room Type", reservation.roomType],
@@ -994,6 +1065,7 @@ document.querySelector("#reservationForm").addEventListener("submit", (event) =>
     id, confirmation: `GH-${String(id).slice(-5)}`, status: values.get("arrivalDate") === dateKey ? "due-in" : "reserved", guestProfileId: `GP-${String(id).slice(-5)}`,
     guestFirstName: values.get("guestFirstName").trim(),
     guestLastName: values.get("guestLastName").trim(),
+    nationality: values.get("nationality"),
     idType: values.get("idType"),
     idNumber: values.get("idNumber").trim(),
     arrivalDate: values.get("arrivalDate"),
@@ -1042,6 +1114,9 @@ document.querySelector("#postChargeForm").addEventListener("submit", (event) => 
   renderAll();
   notify(`${formatPeso(amount)} posted to ${stay.guest}'s folio.`);
 });
+
+document.querySelector("#serviceCategorySelect").addEventListener("change", updateAdditionalBedDefaults);
+document.querySelector("#serviceStaySelect").addEventListener("change", updateAdditionalBedDefaults);
 
 document.querySelector("#paymentMethodSelect").addEventListener("change", (event) => {
   document.querySelector("#cardPaymentSection").classList.toggle("hidden", event.target.value !== "card");

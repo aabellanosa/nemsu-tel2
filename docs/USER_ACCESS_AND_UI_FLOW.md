@@ -64,6 +64,7 @@
   - Room issues requiring attention.
 - Can create reservations and record:
   - Guest first name, guest last name, and contact information.
+  - Guest nationality.
   - Guest ID type and ID number.
   - Arrival and departure dates.
   - Adults and children.
@@ -207,6 +208,7 @@
   - Guest name.
   - Guest first name.
   - Guest last name.
+  - Nationality.
   - Guest ID type.
   - Guest ID number.
   - Arrival date.
@@ -232,6 +234,7 @@
 - Reservations tab lists active reservations with:
   - Guest and confirmation information.
   - Guest first name and last name.
+  - Nationality.
   - ID type and ID number.
   - Stay dates and number of nights.
   - Requested room type and assigned room.
@@ -240,6 +243,7 @@
 - `Details` presents the complete captured reservation information.
 - `Print Confirmation` produces a printable reservation confirmation containing:
   - Guest and confirmation details.
+  - Nationality.
   - Stay dates, room type, and assigned room where available.
   - Occupancy, rate plan, nightly rate, and estimated accommodation total.
   - Guarantee method, contact information, VIP indicator, and notes.
@@ -267,6 +271,7 @@
   - Maintenance condition is `In Service`.
 - Check-in review screen displays:
   - Guest and confirmation number.
+  - Nationality.
   - Guest ID type and ID number.
   - Stay dates and duration.
   - Assigned room and requested room type.
@@ -371,6 +376,7 @@
   - Laundry.
   - Spa.
   - Transportation.
+  - Additional Bed.
   - Business Center.
   - Miscellaneous charges.
 - Accessible in the current prototype to:
@@ -389,6 +395,11 @@
   - Posting notes.
 - System calculates:
   - `quantity x unit price + service charge/tax`.
+- For `Additional Bed`, the prototype fills a room-type-based per-night rate:
+  - Standard Queen: PHP 700.
+  - Deluxe King or Deluxe Twin: PHP 1,000.
+  - Executive Suite: PHP 1,500.
+- These rates follow the common hotel practice of posting extra beds or extra persons as property-defined per-night add-on charges. Production rates should be configurable by room type, season, and rate plan.
 - On posting:
   - A `Service Charge` transaction is appended to the selected guest folio.
   - Folio balance recalculates immediately.
@@ -536,10 +547,12 @@
   - Shift sessions and handovers.
   - Guest profiles.
   - Reservations.
+  - Guest nationality data on guest profiles/reservations.
   - Rooms and room-state history.
   - Stays.
   - Folio transactions.
   - Service charge source/category metadata.
+  - Room-type add-on pricing for items such as additional beds.
   - Audit events.
   - Business-date configuration.
 - Enforce role permissions in Node.js API routes rather than relying on visible tab access alone.

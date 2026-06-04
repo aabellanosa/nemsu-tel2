@@ -64,9 +64,9 @@ The existing navy and gold screen remains usable before Tailwind is built. Tailw
 - Arrival filtering, room-type-aware assignment, and guided check-in review flow
 - Separate front-office occupancy, housekeeping, and maintenance room statuses
 - In-house folio ledger with charge/payment postings and calculated balances
-- Expanded reservation capture and presentation for split guest name, ID document, stay dates, occupants, rates, guarantee, contact, and notes
+- Expanded reservation capture and presentation for split guest name, nationality, ID document, stay dates, occupants, rates, guarantee, contact, and notes
 - Browser-printable reservation confirmations, guest folios, arrival forecasts, room state summaries, cashier ledgers, and departure lists
-- Services / Post Charge workflow for restaurant, room service, minibar, laundry, spa, transport, and miscellaneous add-ons
+- Services / Post Charge workflow for restaurant, room service, minibar, laundry, spa, transport, additional bed, and miscellaneous add-ons
 - Mock credit-card validation, check-in authorization, and cashiering capture flow with masked card display
 - Sticky operator topbar and responsive hamburger drawer navigation for narrow screens
 - Guest/confirmation/room quick lookup
@@ -78,9 +78,10 @@ This first iteration is front-end functionality only. Reservation, room, folio, 
 
 The current browser state is organized around concepts intended to become SQLite entities:
 
-- Reservations retain lifecycle status, dates, requested/assigned rooms, rate and guarantee information.
+- Reservations retain lifecycle status, guest nationality, dates, requested/assigned rooms, rate and guarantee information.
 - Rooms retain separate occupancy, housekeeping, and maintenance states.
 - In-house stays reference reservations and hold append-style folio transaction ledgers.
+- Additional-bed charges are modeled as room-type-priced service postings on the folio ledger.
 - Shift activity entries retain operator attribution.
 
 Role controls remain UI-level demonstrations until a server API enforces authorization.

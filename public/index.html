@@ -162,6 +162,27 @@
         <div class="form-grid">
           <label>Guest first name<input name="guestFirstName" required placeholder="First name"></label>
           <label>Guest last name<input name="guestLastName" required placeholder="Last name"></label>
+          <label>Nationality
+            <select name="nationality" required>
+              <option value="Filipino">🇵🇭 Filipino</option>
+              <option value="American">🇺🇸 American</option>
+              <option value="Australian">🇦🇺 Australian</option>
+              <option value="British">🇬🇧 British</option>
+              <option value="Canadian">🇨🇦 Canadian</option>
+              <option value="Chinese">🇨🇳 Chinese</option>
+              <option value="French">🇫🇷 French</option>
+              <option value="German">🇩🇪 German</option>
+              <option value="Indian">🇮🇳 Indian</option>
+              <option value="Indonesian">🇮🇩 Indonesian</option>
+              <option value="Japanese">🇯🇵 Japanese</option>
+              <option value="Korean">🇰🇷 Korean</option>
+              <option value="Malaysian">🇲🇾 Malaysian</option>
+              <option value="Singaporean">🇸🇬 Singaporean</option>
+              <option value="Thai">🇹🇭 Thai</option>
+              <option value="Vietnamese">🇻🇳 Vietnamese</option>
+              <option value="Other">🏳️ Other / Not listed</option>
+            </select>
+          </label>
           <label>Arrival date<input name="arrivalDate" type="date" required></label>
           <label>Departure date<input name="departureDate" type="date" required></label>
           <label>Room type
@@ -364,13 +385,14 @@
             <select name="stayId" id="serviceStaySelect" required></select>
           </label>
           <label>Service category
-            <select name="category" required>
+            <select name="category" id="serviceCategorySelect" required>
               <option>Restaurant</option>
               <option>Room Service</option>
               <option>Minibar</option>
               <option>Laundry</option>
               <option>Spa</option>
               <option>Transportation</option>
+              <option>Additional Bed</option>
               <option>Business Center</option>
               <option>Miscellaneous</option>
             </select>
@@ -378,7 +400,7 @@
           <label>Description<input name="description" required placeholder="Breakfast in bed, laundry, airport transfer..."></label>
           <label>Reference / Check No.<input name="reference" placeholder="POS check or manual reference"></label>
           <label>Quantity<input name="quantity" type="number" min="1" value="1" required></label>
-          <label>Unit price (PHP)<input name="unitPrice" type="number" min="0" step="0.01" value="0" required></label>
+          <label>Unit price (PHP)<input name="unitPrice" id="serviceUnitPrice" type="number" min="0" step="0.01" value="0" required></label>
           <label>Service charge / tax (PHP)<input name="taxAmount" type="number" min="0" step="0.01" value="0"></label>
         </div>
         <label class="handover-notes">Posting notes
