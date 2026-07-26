@@ -156,7 +156,7 @@ function maskCard(number) {
 }
 
 const state = {
-  session: { user: "A. Santos", role: "Front Desk Agent", shift: "Morning", signedIn: true },
+  session: { user: "", role: "", shift: "", signedIn: false, sessionId: null, userId: null },
   activeView: "dashboard",
   arrivalFilter: "all",
   activeRoom: null,
@@ -278,8 +278,10 @@ const elements = {
 const workstationStateKey = "hmsystem.workstation";
 
 async function apiRequest(path, options = {}) {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (state.session.sessionId) headers["X-Session-Id"] = String(state.session.sessionId);
   const response = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers,
     ...options
   });
   const payload = await response.json();
@@ -296,6 +298,22 @@ function applyRemoteState(remoteState) {
   state.apiConnected = true;
 }
 
+function applySession(session) {
+  if (!session) {
+    state.session = { user: "", role: "", shift: "", signedIn: false, sessionId: null, userId: null };
+    return;
+  }
+  state.session = {
+    user: session.user,
+    role: session.role,
+    shift: session.shift,
+    signedIn: session.signedIn !== false,
+    sessionId: session.sessionId || null,
+    userId: session.userId || null,
+    username: session.username || ""
+  };
+}
+
 async function refreshRemoteState() {
   const payload = await apiRequest("/api/state");
   applyRemoteState(payload.state);
@@ -307,8 +325,19 @@ async function persistMutation(path, options, fallback) {
     fallback?.();
     return false;
   }
-  const payload = await apiRequest(path, options);
+  let payload;
+  try {
+    payload = await apiRequest(path, options);
+  } catch (error) {
+    if (/session/i.test(error.message)) {
+      applySession(null);
+      renderSession();
+      openModal(elements.loginModal);
+    }
+    throw error;
+  }
   applyRemoteState(payload.state);
+  if (payload.session) applySession(payload.session);
   renderSession();
   return true;
 }
@@ -321,7 +350,10 @@ function loadWorkstationState() {
         user: saved.session.user,
         role: saved.session.role,
         shift: saved.session.shift,
-        signedIn: saved.session.signedIn !== false
+        signedIn: saved.session.signedIn !== false,
+        sessionId: saved.session.sessionId || null,
+        userId: saved.session.userId || null,
+        username: saved.session.username || ""
       };
     }
     if (saved.activeView && viewLabels[saved.activeView]) {
@@ -341,6 +373,10 @@ function saveWorkstationState() {
   } catch {
     // Storage may be blocked in some private/restricted browser modes.
   }
+}
+
+function clearWorkstationState() {
+  localStorage.removeItem(workstationStateKey);
 }
 
 function syncTopbarOffset() {
@@ -1587,6 +1623,25 @@ document.querySelector("#handoverForm").addEventListener("submit", (event) => {
   const values = new FormData(event.target);
   const outgoing = { ...state.session };
   const [user, role] = values.get("incomingUser").split("|");
+  if (state.apiConnected) {
+    apiRequest("/api/session/handover", {
+      method: "POST",
+      body: JSON.stringify({
+        sessionId: state.session.sessionId,
+        incomingUser: user,
+        incomingShift: values.get("incomingShift"),
+        notes: values.get("notes")
+      })
+    }).then((payload) => {
+      applySession(payload.session);
+      applyRemoteState(payload.state);
+      closeModal(elements.handoverModal);
+      event.target.reset();
+      renderSession();
+      notify(`${state.session.shift} shift opened for ${state.session.user}.`);
+    }).catch((error) => notify(error.message));
+    return;
+  }
   state.handovers.unshift({ outgoing, incoming: { user, role, shift: values.get("incomingShift") }, notes: values.get("notes") });
   state.session = { user, role, shift: values.get("incomingShift"), signedIn: true };
   addActivity("Shift handover completed", `${outgoing.user} transferred duty to ${user}.`, `${outgoing.user} | ${outgoing.shift}`);
@@ -1598,16 +1653,49 @@ document.querySelector("#handoverForm").addEventListener("submit", (event) => {
 
 document.querySelector("#signOutButton").addEventListener("click", () => {
   if (!state.session.signedIn) return;
+  const signedOutUser = state.session.user;
+  if (state.apiConnected && state.session.sessionId) {
+    apiRequest("/api/session/logout", {
+      method: "POST",
+      body: JSON.stringify({ sessionId: state.session.sessionId })
+    }).catch((error) => {
+      console.info("Session logout warning:", error.message);
+    }).finally(() => {
+      addActivity("Operator signed out", `${signedOutUser} closed access to this workstation.`);
+      applySession(null);
+      clearWorkstationState();
+      renderSession();
+      openModal(elements.loginModal);
+    });
+    return;
+  }
   addActivity("Operator signed out", `${state.session.user} closed access to this workstation.`);
-  state.session.signedIn = false;
+  applySession(null);
+  clearWorkstationState();
   renderSession();
   openModal(elements.loginModal);
 });
 
-document.querySelector("#loginForm").addEventListener("submit", (event) => {
+document.querySelector("#loginForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const values = new FormData(event.target);
   const [user, role] = values.get("loginUser").split("|");
+  if (state.apiConnected) {
+    try {
+      const payload = await apiRequest("/api/session/login", {
+        method: "POST",
+        body: JSON.stringify({ user, shift: values.get("loginShift") })
+      });
+      applySession(payload.session);
+      applyRemoteState(payload.state);
+      closeModal(elements.loginModal);
+      renderSession();
+      notify(`Welcome, ${state.session.user}. ${state.session.role} access enabled.`);
+    } catch (error) {
+      notify(error.message);
+    }
+    return;
+  }
   state.session = { user, role, shift: values.get("loginShift"), signedIn: true };
   addActivity("Operator signed in", `${user} opened the ${state.session.shift} workspace.`);
   closeModal(elements.loginModal);
@@ -1623,6 +1711,17 @@ async function initializeApp() {
   loadWorkstationState();
   try {
     await refreshRemoteState();
+    if (state.session.sessionId) {
+      try {
+        const payload = await apiRequest(`/api/session/${state.session.sessionId}`);
+        applySession(payload.session);
+      } catch {
+        applySession(null);
+        clearWorkstationState();
+      }
+    }
+    renderSession();
+    if (!state.session.signedIn) openModal(elements.loginModal);
   } catch (error) {
     state.apiConnected = false;
     console.info("Using local demo state:", error.message);

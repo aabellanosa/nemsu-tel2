@@ -196,6 +196,7 @@ create index if not exists idx_reservations_status_arrival on reservations(statu
 create index if not exists idx_stays_status_room on stays(status, room_id);
 create index if not exists idx_folio_transactions_folio on folio_transactions(folio_id, created_at);
 create index if not exists idx_audit_events_created on audit_events(created_at);
+create unique index if not exists idx_shift_sessions_one_active_user on shift_sessions(user_id) where status = 'active';
 
 create or replace function set_updated_at()
 returns trigger as $$

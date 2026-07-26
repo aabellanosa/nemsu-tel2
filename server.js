@@ -89,6 +89,10 @@ function toNumberOrNull(value) {
   return value == null ? null : Number(value);
 }
 
+function businessDateExpression() {
+  return "(now() at time zone 'Asia/Manila')::date";
+}
+
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -109,6 +113,11 @@ function readJsonBody(req) {
     });
     req.on("error", reject);
   });
+}
+
+function getRequestSessionId(req) {
+  const value = req.headers["x-session-id"];
+  return value ? Number(value) : null;
 }
 
 function requireDatabase(res) {
@@ -316,6 +325,44 @@ async function fetchActivity(client = pool) {
   return result.rows;
 }
 
+async function fetchSession(sessionId, client = pool) {
+  if (!sessionId) return null;
+  const result = await client.query(`
+    select
+      shift_sessions.id as "sessionId",
+      users.id as "userId",
+      users.display_name as "user",
+      users.username,
+      roles.name as role,
+      shift_sessions.shift_name as shift,
+      shift_sessions.status,
+      business_dates.id as "businessDateId",
+      business_dates.business_date as "businessDate"
+    from shift_sessions
+    join users on users.id = shift_sessions.user_id
+    join roles on roles.id = users.role_id
+    left join business_dates on business_dates.id = shift_sessions.business_date_id
+    where shift_sessions.id = $1
+  `, [sessionId]);
+  const session = result.rows[0];
+  if (!session) return null;
+  return {
+    ...session,
+    sessionId: toNumberOrNull(session.sessionId),
+    userId: toNumberOrNull(session.userId),
+    businessDateId: toNumberOrNull(session.businessDateId),
+    businessDate: formatDateOnly(session.businessDate),
+    signedIn: session.status === "active"
+  };
+}
+
+async function requireActiveSession(req, res, client = pool) {
+  const session = await fetchSession(getRequestSessionId(req), client);
+  if (session && session.signedIn) return session;
+  sendJson(res, 401, { ok: false, message: "Active operator session is required. Please sign in again." });
+  return null;
+}
+
 async function fetchAppState(client = pool) {
   const [rooms, reservations, stays, activity, cardData] = await Promise.all([
     fetchRooms(client),
@@ -334,10 +381,20 @@ async function fetchAppState(client = pool) {
   };
 }
 
-async function logAudit(client, eventType, entityType, entityId, summary) {
+async function logAudit(client, eventType, entityType, entityId, summary, session = null) {
   await client.query(
-    "insert into audit_events (event_type, entity_type, entity_id, summary) values ($1, $2, $3, $4)",
-    [eventType, entityType, entityId == null ? null : String(entityId), summary]
+    `insert into audit_events
+      (event_type, entity_type, entity_id, summary, performed_by, shift_session_id, business_date_id)
+     values ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      eventType,
+      entityType,
+      entityId == null ? null : String(entityId),
+      summary,
+      session?.userId || null,
+      session?.sessionId || null,
+      session?.businessDateId || null
+    ]
   );
 }
 
@@ -405,6 +462,151 @@ async function resetDemoData() {
   await pool.query(seedSql);
 }
 
+async function ensureOpenBusinessDate(client = pool) {
+  const result = await client.query(`
+    insert into business_dates (business_date, status)
+    values (${businessDateExpression()}, 'open')
+    on conflict (business_date) do update set status = 'open'
+    returning id, business_date
+  `);
+  return {
+    id: toNumberOrNull(result.rows[0].id),
+    businessDate: formatDateOnly(result.rows[0].business_date)
+  };
+}
+
+async function openOperatorSession(client, { userName, shift, handoverNotes = null }) {
+  const userResult = await client.query(`
+    select
+      users.id,
+      users.display_name,
+      users.username,
+      roles.name as role
+    from users
+    join roles on roles.id = users.role_id
+    where users.is_active = true
+      and (users.display_name = $1 or users.username = $1)
+    limit 1
+  `, [userName]);
+
+  const user = userResult.rows[0];
+  if (!user) throw new Error("Operator was not found or is inactive.");
+
+  const active = await client.query(
+    "select id from shift_sessions where user_id = $1 and status = 'active' limit 1",
+    [user.id]
+  );
+  if (active.rows[0]) {
+    throw new Error(`${user.display_name} is already signed in on another workstation.`);
+  }
+
+  const businessDate = await ensureOpenBusinessDate(client);
+  const sessionResult = await client.query(`
+    insert into shift_sessions (user_id, business_date_id, shift_name, handover_notes)
+    values ($1, $2, $3, $4)
+    returning id
+  `, [user.id, businessDate.id, shift, handoverNotes]);
+
+  return {
+    sessionId: toNumberOrNull(sessionResult.rows[0].id),
+    userId: toNumberOrNull(user.id),
+    user: user.display_name,
+    username: user.username,
+    role: user.role,
+    shift,
+    status: "active",
+    signedIn: true,
+    businessDateId: businessDate.id,
+    businessDate: businessDate.businessDate
+  };
+}
+
+async function closeOperatorSession(client, sessionId, notes = null) {
+  const session = await fetchSession(sessionId, client);
+  if (!session || !session.signedIn) throw new Error("Active operator session was not found.");
+  await client.query(
+    "update shift_sessions set status = 'closed', ended_at = now(), handover_notes = coalesce($2, handover_notes) where id = $1",
+    [sessionId, notes]
+  );
+  return session;
+}
+
+async function handleSessionRoute(req, res, requestPath) {
+  if (req.method === "GET") {
+    const match = requestPath.match(/^\/api\/session\/(\d+)$/);
+    if (!match) return false;
+    const session = await fetchSession(Number(match[1]));
+    if (!session || !session.signedIn) {
+      sendJson(res, 404, { ok: false, message: "Operator session is no longer active." });
+      return true;
+    }
+    sendJson(res, 200, { ok: true, session });
+    return true;
+  }
+
+  if (req.method !== "POST") return false;
+
+  const body = await readJsonBody(req);
+
+  if (requestPath === "/api/session/login") {
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      const session = await openOperatorSession(client, { userName: body.user, shift: body.shift });
+      await logAudit(client, "operator_login", "shift_session", session.sessionId, `${session.user} signed in for ${session.shift}`, session);
+      await client.query("commit");
+      sendJson(res, 200, { ok: true, session, state: await fetchAppState() });
+    } catch (error) {
+      await client.query("rollback");
+      sendJson(res, 409, { ok: false, message: error.message });
+    } finally {
+      client.release();
+    }
+    return true;
+  }
+
+  if (requestPath === "/api/session/logout") {
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      const session = await closeOperatorSession(client, body.sessionId);
+      await logAudit(client, "operator_logout", "shift_session", session.sessionId, `${session.user} signed out`, session);
+      await client.query("commit");
+      sendJson(res, 200, { ok: true });
+    } catch (error) {
+      await client.query("rollback");
+      sendJson(res, 400, { ok: false, message: error.message });
+    } finally {
+      client.release();
+    }
+    return true;
+  }
+
+  if (requestPath === "/api/session/handover") {
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      const outgoing = await closeOperatorSession(client, body.sessionId, body.notes || null);
+      const incoming = await openOperatorSession(client, {
+        userName: body.incomingUser,
+        shift: body.incomingShift,
+        handoverNotes: body.notes || null
+      });
+      await logAudit(client, "operator_handover", "shift_session", incoming.sessionId, `${outgoing.user} transferred duty to ${incoming.user}`, incoming);
+      await client.query("commit");
+      sendJson(res, 200, { ok: true, session: incoming, state: await fetchAppState() });
+    } catch (error) {
+      await client.query("rollback");
+      sendJson(res, 409, { ok: false, message: error.message });
+    } finally {
+      client.release();
+    }
+    return true;
+  }
+
+  return false;
+}
+
 async function handleMutation(req, res, requestPath) {
   const body = await readJsonBody(req);
 
@@ -415,9 +617,12 @@ async function handleMutation(req, res, requestPath) {
     }
 
     try {
+      const session = await requireActiveSession(req, res);
+      if (!session) return true;
       await resetDemoData();
-      await logAudit(pool, "demo_reset", "system", null, "Demo data reset to practicum baseline");
-      sendJson(res, 200, { ok: true, state: await fetchAppState() });
+      const resetSession = await openOperatorSession(pool, { userName: session.user, shift: session.shift });
+      await logAudit(pool, "demo_reset", "system", null, "Demo data reset to practicum baseline", resetSession);
+      sendJson(res, 200, { ok: true, session: resetSession, state: await fetchAppState() });
     } catch (error) {
       sendJson(res, 500, { ok: false, message: error.message });
     }
@@ -428,6 +633,11 @@ async function handleMutation(req, res, requestPath) {
     const client = await pool.connect();
     try {
       await client.query("begin");
+      const session = await requireActiveSession(req, res, client);
+      if (!session) {
+        await client.query("rollback");
+        return true;
+      }
       const guest = await client.query(
         `insert into guest_profiles (first_name, last_name, nationality, phone, email, vip, notes)
          values ($1, $2, $3, $4, $5, $6, $7)
@@ -459,7 +669,8 @@ async function handleMutation(req, res, requestPath) {
           body.notes || null
         ]
       );
-      await logAudit(client, "reservation", "reservation", reservation.rows[0].id, `Reservation created for ${body.guestFirstName} ${body.guestLastName}`);
+      await client.query("update reservations set created_by = $1 where id = $2", [session.userId, reservation.rows[0].id]);
+      await logAudit(client, "reservation", "reservation", reservation.rows[0].id, `Reservation created for ${body.guestFirstName} ${body.guestLastName}`, session);
       await client.query("commit");
       sendJson(res, 201, { ok: true, state: await fetchAppState() });
     } catch (error) {
@@ -477,6 +688,11 @@ async function handleMutation(req, res, requestPath) {
     const client = await pool.connect();
     try {
       await client.query("begin");
+      const session = await requireActiveSession(req, res, client);
+      if (!session) {
+        await client.query("rollback");
+        return true;
+      }
       const reservation = await client.query("select id, requested_room_type, guest_profile_id from reservations where id = $1 for update", [reservationId]);
       if (!reservation.rows[0]) throw new Error("Reservation not found.");
       const roomTypeCode = { "Standard Queen": "STD", "Deluxe King": "DLX", "Deluxe Twin": "DLX", "Executive Suite": "STE", Deluxe: "DLX" }[reservation.rows[0].requested_room_type];
@@ -492,7 +708,7 @@ async function handleMutation(req, res, requestPath) {
       const guest = await client.query("select first_name || ' ' || last_name as name from guest_profiles where id = $1", [reservation.rows[0].guest_profile_id]);
       await client.query("update reservations set assigned_room_id = $1 where id = $2", [room.rows[0].id, reservationId]);
       await client.query("update rooms set occupancy_status = 'assigned', current_guest_name = $1 where id = $2", [guest.rows[0].name, room.rows[0].id]);
-      await logAudit(client, "room_assignment", "reservation", reservationId, `Room ${room.rows[0].room_number} assigned to ${guest.rows[0].name}`);
+      await logAudit(client, "room_assignment", "reservation", reservationId, `Room ${room.rows[0].room_number} assigned to ${guest.rows[0].name}`, session);
       await client.query("commit");
       sendJson(res, 200, { ok: true, state: await fetchAppState() });
     } catch (error) {
@@ -510,6 +726,11 @@ async function handleMutation(req, res, requestPath) {
     const client = await pool.connect();
     try {
       await client.query("begin");
+      const session = await requireActiveSession(req, res, client);
+      if (!session) {
+        await client.query("rollback");
+        return true;
+      }
       const result = await client.query(
         `select reservations.*, rooms.id as room_id, rooms.room_number, guest_profiles.first_name || ' ' || guest_profiles.last_name as guest_name
          from reservations
@@ -532,9 +753,10 @@ async function handleMutation(req, res, requestPath) {
       const folio = await client.query("insert into folios (stay_id) values ($1) returning id", [stay.rows[0].id]);
       const nights = Math.max(1, Math.round((new Date(reservation.departure_date) - new Date(reservation.arrival_date)) / 86400000));
       await client.query(
-        `insert into folio_transactions (folio_id, transaction_type, source, description, amount, reference)
-         values ($1, 'room_charge', 'front_desk', $2, $3, $4)`,
-        [folio.rows[0].id, `${nights} night accommodation`, Number(reservation.nightly_rate) * nights, `POST-${reservation.confirmation_number}`]
+        `insert into folio_transactions
+          (folio_id, transaction_type, source, description, amount, reference, performed_by, shift_session_id)
+         values ($1, 'room_charge', 'front_desk', $2, $3, $4, $5, $6)`,
+        [folio.rows[0].id, `${nights} night accommodation`, Number(reservation.nightly_rate) * nights, `POST-${reservation.confirmation_number}`, session.userId, session.sessionId]
       );
       if (body.authorization) {
         await createCardAuthorization(client, body.authorization, {
@@ -543,7 +765,7 @@ async function handleMutation(req, res, requestPath) {
           stayId: stay.rows[0].id
         });
       }
-      await logAudit(client, "check_in", "stay", stay.rows[0].id, `${reservation.guest_name} checked in to room ${reservation.room_number}`);
+      await logAudit(client, "check_in", "stay", stay.rows[0].id, `${reservation.guest_name} checked in to room ${reservation.room_number}`, session);
       await client.query("commit");
       sendJson(res, 200, { ok: true, state: await fetchAppState() });
     } catch (error) {
@@ -557,28 +779,32 @@ async function handleMutation(req, res, requestPath) {
 
   const roomMatch = requestPath.match(/^\/api\/rooms\/([^/]+)$/);
   if (req.method === "PATCH" && roomMatch) {
+    const session = await requireActiveSession(req, res);
+    if (!session) return true;
     await pool.query(
       "update rooms set housekeeping_status = $1, maintenance_status = $2 where room_number = $3",
       [body.housekeeping, toDbMaintenanceStatus(body.maintenance), decodeURIComponent(roomMatch[1])]
     );
-    await logAudit(pool, "room_status", "room", decodeURIComponent(roomMatch[1]), `Room ${decodeURIComponent(roomMatch[1])} status updated`);
+    await logAudit(pool, "room_status", "room", decodeURIComponent(roomMatch[1]), `Room ${decodeURIComponent(roomMatch[1])} status updated`, session);
     sendJson(res, 200, { ok: true, state: await fetchAppState() });
     return true;
   }
 
   const serviceMatch = requestPath.match(/^\/api\/stays\/(\d+)\/service-charge$/);
   if (req.method === "POST" && serviceMatch) {
+    const session = await requireActiveSession(req, res);
+    if (!session) return true;
     const stayId = Number(serviceMatch[1]);
     const category = await pool.query("select id from service_categories where name = $1", [body.category]);
     const folio = await pool.query("select id from folios where stay_id = $1 and status = 'open' limit 1", [stayId]);
     if (!folio.rows[0]) return sendJson(res, 404, { ok: false, message: "Open folio not found." });
     await pool.query(
       `insert into folio_transactions
-        (folio_id, transaction_type, source, service_category_id, description, amount, reference, notes)
-       values ($1, 'service_charge', 'services', $2, $3, $4, $5, $6)`,
-      [folio.rows[0].id, category.rows[0]?.id || null, body.description, body.amount, body.reference, body.notes || null]
+        (folio_id, transaction_type, source, service_category_id, description, amount, reference, notes, performed_by, shift_session_id)
+       values ($1, 'service_charge', 'services', $2, $3, $4, $5, $6, $7, $8)`,
+      [folio.rows[0].id, category.rows[0]?.id || null, body.description, body.amount, body.reference, body.notes || null, session.userId, session.sessionId]
     );
-    await logAudit(pool, "service_charge", "stay", stayId, `Service charge posted: ${body.description}`);
+    await logAudit(pool, "service_charge", "stay", stayId, `Service charge posted: ${body.description}`, session);
     sendJson(res, 200, { ok: true, state: await fetchAppState() });
     return true;
   }
@@ -589,6 +815,11 @@ async function handleMutation(req, res, requestPath) {
     const client = await pool.connect();
     try {
       await client.query("begin");
+      const session = await requireActiveSession(req, res, client);
+      if (!session) {
+        await client.query("rollback");
+        return true;
+      }
       const stay = await client.query("select guest_profile_id, reservation_id from stays where id = $1", [stayId]);
       const folio = await client.query("select id from folios where stay_id = $1 and status = 'open' limit 1", [stayId]);
       if (!folio.rows[0] || !stay.rows[0]) throw new Error("Open folio not found.");
@@ -603,11 +834,12 @@ async function handleMutation(req, res, requestPath) {
         });
       }
       await client.query(
-        `insert into folio_transactions (folio_id, transaction_type, source, description, amount, reference)
-         values ($1, 'payment', $2, $3, $4, $5)`,
-        [folio.rows[0].id, body.source, body.description, -Math.abs(Number(body.amount)), body.reference]
+        `insert into folio_transactions
+          (folio_id, transaction_type, source, description, amount, reference, performed_by, shift_session_id)
+         values ($1, 'payment', $2, $3, $4, $5, $6, $7)`,
+        [folio.rows[0].id, body.source, body.description, -Math.abs(Number(body.amount)), body.reference, session.userId, session.sessionId]
       );
-      await logAudit(client, "payment", "stay", stayId, `Payment posted: ${body.description}`);
+      await logAudit(client, "payment", "stay", stayId, `Payment posted: ${body.description}`, session);
       await client.query("commit");
       sendJson(res, 200, { ok: true, state: await fetchAppState() });
     } catch (error) {
@@ -625,13 +857,18 @@ async function handleMutation(req, res, requestPath) {
     const client = await pool.connect();
     try {
       await client.query("begin");
+      const session = await requireActiveSession(req, res, client);
+      if (!session) {
+        await client.query("rollback");
+        return true;
+      }
       const stay = await client.query("select room_id, reservation_id from stays where id = $1 for update", [stayId]);
       if (!stay.rows[0]) throw new Error("Stay not found.");
       await client.query("update stays set status = 'checked_out', checked_out_at = now() where id = $1", [stayId]);
       await client.query("update folios set status = 'closed' where stay_id = $1", [stayId]);
       await client.query("update rooms set occupancy_status = 'vacant', housekeeping_status = 'dirty', current_guest_name = null where id = $1", [stay.rows[0].room_id]);
       if (stay.rows[0].reservation_id) await client.query("update reservations set status = 'checked_out' where id = $1", [stay.rows[0].reservation_id]);
-      await logAudit(client, "check_out", "stay", stayId, "Guest checked out");
+      await logAudit(client, "check_out", "stay", stayId, "Guest checked out", session);
       await client.query("commit");
       sendJson(res, 200, { ok: true, state: await fetchAppState() });
     } catch (error) {
@@ -675,6 +912,15 @@ async function handleApi(req, res, requestPath) {
   }
 
   if (!requireDatabase(res)) return true;
+
+  if (requestPath.startsWith("/api/session")) {
+    try {
+      if (await handleSessionRoute(req, res, requestPath)) return true;
+    } catch (error) {
+      sendJson(res, 400, { ok: false, message: error.message });
+      return true;
+    }
+  }
 
   if (requestPath === "/api/state" && req.method === "GET") {
     try {
