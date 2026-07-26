@@ -3,8 +3,8 @@
 ## Purpose
 
 - This document defines who uses the system, which tabs each role can access, and which operational actions each role may perform.
-- It documents the current UI workflow before persistent storage and server-side authorization are implemented.
-- In the current prototype, records remain available only during the open browser session and reset after page refresh.
+- It documents the current UI workflow while the prototype transitions into a PostgreSQL-backed practicum sandbox.
+- Core room, reservation, stay, folio, and reset workflows are now persisted through the Node/PostgreSQL API when `DATABASE_URL` is configured.
 - For production deployment, these permissions must be enforced by the server and recorded in a permanent audit trail.
 
 ## Browser and Device Support
@@ -493,11 +493,11 @@
   - Services Summary.
   - Departure List.
 - Selecting a report opens a print-formatted browser document and invokes the browser print dialog.
-- Printable reports contain only records available in the current browser session:
+- Printable reports are generated from the current loaded PMS state:
   - Arrival Forecast lists current active reservations and room assignment status.
   - Room State Summary lists occupancy, housekeeping, and maintenance status by room.
   - Cashier Ledger summarizes open in-house folios and outstanding balance totals.
-  - Services Summary lists service charges posted during the current browser session.
+  - Services Summary lists service charges in the currently loaded PMS state.
   - Departure List identifies in-house guests, balances, and readiness for check-out.
 - Printing actions are reflected in the current shift activity log.
 - The UI does not yet save report copies, assign official report numbers, or archive printed output.
@@ -531,16 +531,17 @@
 
 ## Current Prototype Limitations
 
-- All state is held in browser memory and resets on page refresh.
 - User selection demonstrates roles but is not secure authentication.
-- Permissions are enforced in the UI only; a production API must enforce authorization.
+- Workstation user/view selection is remembered in browser `localStorage`, but it is not a secure server session.
+- Permissions are still primarily enforced in the UI; a production API must enforce authorization.
+- Other browsers/devices see shared state after refresh, but automatic realtime updates are not implemented yet.
 - Folio workflow presently supports sample charges and settlement payments only.
 - Credit card handling is simulated only; it does not contact a real payment gateway and must never be used for real card processing.
 - No cancellation, no-show, room move, upgrade, deposit processing, adjustment, refund, group block, or night-audit rollover workflow is included yet.
 - Services posting is manual and does not integrate with a restaurant POS yet.
-- Printable reports and folios are created from browser-session data only and are not generated from persisted records or archived.
+- Printable reports and folios are generated in the browser and are not archived as official persisted report documents.
 
-## Recommended SQLite Transition Scope
+## Recommended Next Persistence Scope
 
 - Persist core entities:
   - Users, roles, and permissions.

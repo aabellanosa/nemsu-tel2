@@ -9,8 +9,10 @@ This branch migrates HMSystem from a static Namecheap prototype toward a shared 
 - `server.js` now also exposes API routes under `/api/`.
 - `/api/health` verifies that the Node service is running.
 - If `DATABASE_URL` is configured, `/api/health` also checks PostgreSQL connectivity.
-- `/api/rooms` returns persisted room inventory once PostgreSQL is configured.
-- `/api/bootstrap` returns persisted roles, users, service categories, and the active business date once PostgreSQL is configured.
+- `/api/state` returns the shared PMS state used by the UI.
+- The current UI writes reservations, room assignment, check-in, room status, service charges, payments, check-out, and demo reset through the API.
+- `/api/rooms` returns persisted room inventory.
+- `/api/bootstrap` returns persisted roles, users, service categories, and the active business date.
 
 ## Local Development
 
@@ -34,9 +36,10 @@ http://localhost:3000/api/health
 
 Without `DATABASE_URL`, the API should return `database.status = "not_configured"`.
 
-Read-only persistence endpoints:
+Persistence endpoints:
 
 ```text
+http://localhost:3000/api/state
 http://localhost:3000/api/rooms
 http://localhost:3000/api/bootstrap
 ```
@@ -63,16 +66,22 @@ Render start command:
 npm start
 ```
 
-## Planned Migration Phases
+## Migration Phase Status
 
-1. Add PostgreSQL schema and seed scripts based on the current static PMS data.
-2. Add read-only API endpoints for rooms, reservations, stays, folios, users, shifts, and services.
-3. Replace browser seed state with API-loaded state.
-4. Replace frontend mutations with API writes.
-5. Add real login/session handling.
-6. Enforce role permissions in the backend.
-7. Add audit logging for every write.
-8. Add polling or realtime refresh so concurrent users see shared state.
+Completed:
+
+1. Add PostgreSQL schema and seed scripts based on the static PMS data.
+2. Add API endpoints for shared rooms, reservations, stays, folios, users, services, and reset.
+3. Replace initial browser state with API-loaded state when a database is configured.
+4. Replace current core frontend mutations with API writes.
+5. Add practicum demo reset.
+
+Next:
+
+1. Add real login/session handling.
+2. Enforce role permissions in the backend.
+3. Add full operator/session audit logging for every write.
+4. Add manual refresh, polling, or realtime refresh so concurrent users see shared state without browser reload.
 
 ## Important Boundary
 
@@ -118,3 +127,7 @@ Initial seed data currently covers:
 - service categories
 - current business date
 - room inventory/status baseline
+- due-in arrivals for the current Asia/Manila business date
+- active in-house guests
+- folios and starter payment examples
+- practicum reset baseline

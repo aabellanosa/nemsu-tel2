@@ -1,6 +1,6 @@
 # Static Deployment to Namecheap
 
-This project currently deploys the non-persistent browser prototype by uploading the built `public/` folder to a Namecheap-hosted subdomain.
+This document describes the legacy static deployment path that uploaded the built `public/` folder to a Namecheap-hosted subdomain.
 
 For the Render/PostgreSQL migration, see [Render + PostgreSQL Migration](RENDER_POSTGRES_MIGRATION.md).
 
@@ -53,11 +53,11 @@ That includes:
 - `tailwind.css`
 - `app.js`
 
-The Node server and SQLite persistence are not part of this static deployment.
+The Node server and PostgreSQL API are not part of this static deployment.
 
 ## Notes
 
 - Do not commit FTP credentials.
 - If the secrets are missing, the workflow still runs CI checks but skips deployment.
-- This deployment is suitable only for the current non-persistent prototype.
-- Once SQLite and server-side authentication are added, deployment must move to a Node-capable hosting setup.
+- This deployment is suitable only for the earlier non-persistent prototype.
+- The current shared-state build should deploy to a Node-capable host such as Render.

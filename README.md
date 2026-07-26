@@ -1,10 +1,11 @@
 # Front Desk Console
 
-A Micros-Fidelio-inspired hotel property management UI prototype built with a dependency-free Node.js static server and browser-side demo state.
+A Micros-Fidelio-inspired hotel property management UI prototype built with a Node.js server, browser UI, Tailwind styling support, and PostgreSQL-backed shared state for practicum testing.
 
 ## Functional Documentation
 
 - [User Access and UI Flow](docs/USER_ACCESS_AND_UI_FLOW.md) defines roles, allowed tabs, operational permissions, reservation/check-in/cashiering/departure flow, shift handover, and the planned persistence boundary.
+- [Current Build State](docs/CURRENT_BUILD_STATE.md) summarizes the present Render/PostgreSQL build, local setup, API surface, demo reset, limitations, and next build series.
 - [Static Deployment to Namecheap](docs/DEPLOYMENT.md) explains the GitHub Actions deployment flow and required repository secrets.
 - [Render + PostgreSQL Migration](docs/RENDER_POSTGRES_MIGRATION.md) tracks the migration from static prototype to shared persistent deployment.
 
@@ -45,6 +46,22 @@ For live Tailwind rebuilding while customizing the UI, run this in a second term
 npm run watch:css
 ```
 
+## Database
+
+For shared state, configure `DATABASE_URL` in `.env` using the Render External Database URL or another PostgreSQL database.
+
+```powershell
+npm run db:migrate
+npm run db:seed
+```
+
+Useful local checks:
+
+```text
+http://localhost:3000/api/health
+http://localhost:3000/api/state
+```
+
 ## Styling
 
 The existing navy and gold screen remains usable before Tailwind is built. Tailwind is loaded as an enhancement layer from `public/tailwind.css`, so migration can happen gradually without disturbing the current interface.
@@ -72,17 +89,17 @@ The existing navy and gold screen remains usable before Tailwind is built. Tailw
 - Sticky operator topbar and responsive hamburger drawer navigation for narrow screens
 - Guest/confirmation/room quick lookup
 - Shift activity feed
+- PostgreSQL-backed state hydration and writes for the current core PMS workflow
+- Practicum demo reset from the Reports module
 
-This first iteration is front-end functionality only. Reservation, room, folio, user-session, and handover data reset when the page reloads. The session workflow is intended to establish the permission and audit model before adding SQLite persistence.
+## Persistence Notes
 
-## Persistence-Ready Concepts
-
-The current browser state is organized around concepts intended to become SQLite entities:
+The current shared database state is organized around these PostgreSQL-backed concepts:
 
 - Reservations retain lifecycle status, guest nationality, dates, requested/assigned rooms, rate and guarantee information.
 - Rooms retain separate occupancy, housekeeping, and maintenance states.
 - In-house stays reference reservations and hold append-style folio transaction ledgers.
 - Additional-bed charges are modeled as room-type-priced service postings on the folio ledger.
-- Shift activity entries retain operator attribution.
+- Shift activity entries are moving toward durable operator attribution.
 
-Role controls remain UI-level demonstrations until a server API enforces authorization.
+Role controls still need backend enforcement. The next recommended build slice is server-backed operator sessions and audit control.
