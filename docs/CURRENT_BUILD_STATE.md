@@ -130,6 +130,15 @@ npm run db:seed
     - activity feed
 - `GET /api/bootstrap`
   - Returns roles, users, service categories, and current business date.
+- `POST /api/session/login`
+  - Opens a server-backed operator shift session for a selected demo user and shift.
+  - Blocks a second active session for the same operator.
+- `POST /api/session/logout`
+  - Closes the active operator session.
+- `GET /api/session/:id`
+  - Validates the browser's remembered session after refresh.
+- `POST /api/session/handover`
+  - Closes the outgoing operator session and opens the incoming operator session.
 - `GET /api/rooms`
   - Returns persisted room inventory.
 - `POST /api/reservations`
@@ -189,7 +198,11 @@ npm run db:seed
 
 - The UI loads shared state from `/api/state` on startup.
 - If the API/database is unavailable, the browser falls back to local demo state.
-- Workstation user/view selection is remembered in browser `localStorage`.
+- Operator sign-in is server-backed when PostgreSQL is configured.
+- The browser remembers only the current session/workstation identifier in `localStorage`.
+- Refresh validates the remembered session through the API before restoring the operator view.
+- PostgreSQL keeps `shift_sessions` for sign-in, sign-out, and handover.
+- The database prevents one demo operator from having two active sessions at the same time.
 - Data changes persist in PostgreSQL and become visible to other browsers after refresh.
 - Automatic realtime updates are not implemented yet.
 
@@ -209,30 +222,41 @@ npm run db:seed
 - Complete check-out after folio settlement.
 - Generate browser-printable operational reports.
 - Reset practicum data to baseline.
+- Server-backed operator sign-in, sign-out, and handover.
+- Duplicate active login blocking for the same demo operator.
 
 ## Known Limitations
 
-- User login is still a demo browser-side selection, not secure authentication.
-- Same operator can still be selected in multiple browsers.
-- Backend route permissions are not fully enforced yet.
-- Audit events exist but do not yet capture full operator/session context for every action.
+- User login is server-backed but still demo-grade; it does not use passwords, OAuth, MFA, or production user administration.
+- Duplicate login blocking exists, but there is no supervisor override or forced stale-session release yet.
+- Backend write routes require an active session, but the full role permission matrix is not fully enforced yet.
+- Audit events now receive session context for core write routes, but audit detail still needs hardening for production use.
 - Other browsers do not update automatically until refresh.
 - Conflict handling is basic.
-- No production-grade password handling, OAuth, or user administration.
 - No room move, cancellation/no-show, refund, adjustment, group block, or night audit rollover workflow yet.
 - Mock credit-card handling is only for training; never enter real card data.
 
 ## Next Logical Build Series
 
-Recommended next series: `Operator Sessions and Audit Control`.
+Recommended next series: `Backend Permissions and Audit Hardening`.
 
 Suggested order:
 
-1. Add server-backed login/session endpoint.
-2. Create real `shift_sessions` on login.
-3. Prevent one operator from being active in two browsers unless overridden later.
-4. Attach `user_id`, `role`, `shift_session_id`, and `business_date_id` to all write actions.
-5. Enforce role permissions on the backend.
-6. Add a manual `Refresh State` control.
-7. Add friendly stale-state/conflict messages.
+1. Enforce role permissions on the backend for each write route.
+2. Add a supervisor-only stale-session release or duplicate-login override.
+3. Harden audit detail for previous/new values on sensitive actions.
+4. Add a manual `Refresh State` control.
+5. Add friendly stale-state/conflict messages.
+6. Add optional polling or realtime refresh for concurrent users.
 
+## Operator Session Test Run
+
+Use this after migration and seed/reset to verify the current run:
+
+1. Open the app in Browser A and sign in as a Front Desk user.
+2. Open the app in Browser B or an incognito window.
+3. Try signing in as the same user; the app should reject the duplicate active login.
+4. Sign out in Browser A.
+5. Sign in with the same user in Browser B; it should now be allowed.
+6. Refresh the signed-in browser; the operator view should restore from the active server session.
+7. Use `Change Shift`; the outgoing session should close and the incoming session should become active.

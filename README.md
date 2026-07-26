@@ -91,6 +91,8 @@ The existing navy and gold screen remains usable before Tailwind is built. Tailw
 - Shift activity feed
 - PostgreSQL-backed state hydration and writes for the current core PMS workflow
 - Practicum demo reset from the Reports module
+- Server-backed demo operator login, logout, refresh validation, and shift handover
+- Duplicate active-login blocking for the same demo operator
 
 ## Persistence Notes
 
@@ -100,6 +102,7 @@ The current shared database state is organized around these PostgreSQL-backed co
 - Rooms retain separate occupancy, housekeeping, and maintenance states.
 - In-house stays reference reservations and hold append-style folio transaction ledgers.
 - Additional-bed charges are modeled as room-type-priced service postings on the folio ledger.
-- Shift activity entries are moving toward durable operator attribution.
+- Shift sessions track demo operator sign-in, sign-out, and handover.
+- Core write routes require an active operator session when PostgreSQL is configured.
 
-Role controls still need backend enforcement. The next recommended build slice is server-backed operator sessions and audit control.
+Role controls still need full backend enforcement. The next recommended build slice is backend permission hardening, stale-session release/override, and stronger audit detail.

@@ -13,6 +13,9 @@ This branch migrates HMSystem from a static Namecheap prototype toward a shared 
 - The current UI writes reservations, room assignment, check-in, room status, service charges, payments, check-out, and demo reset through the API.
 - `/api/rooms` returns persisted room inventory.
 - `/api/bootstrap` returns persisted roles, users, service categories, and the active business date.
+- `/api/session/login`, `/api/session/logout`, `/api/session/:id`, and `/api/session/handover` now manage demo operator sessions.
+- PostgreSQL `shift_sessions` are created and closed by sign-in, sign-out, and handover.
+- The database blocks two active sessions for the same demo operator.
 
 ## Local Development
 
@@ -75,17 +78,20 @@ Completed:
 3. Replace initial browser state with API-loaded state when a database is configured.
 4. Replace current core frontend mutations with API writes.
 5. Add practicum demo reset.
+6. Add server-backed operator login, logout, refresh validation, and shift handover.
+7. Block duplicate active sessions for the same demo operator.
+8. Attach active session context to core API write actions.
 
 Next:
 
-1. Add real login/session handling.
-2. Enforce role permissions in the backend.
-3. Add full operator/session audit logging for every write.
+1. Enforce role permissions in the backend.
+2. Add supervisor-only stale-session release or duplicate-login override.
+3. Harden operator/session audit detail for every write.
 4. Add manual refresh, polling, or realtime refresh so concurrent users see shared state without browser reload.
 
 ## Important Boundary
 
-The current UI role system is still frontend-only. Once writes move to the API, permissions must be enforced in `server.js` or backend route modules, not only by hiding buttons in the browser.
+The current UI role system is no longer purely browser-side because write routes require an active server session. Full role authorization still needs to be enforced in `server.js` or backend route modules, not only by hiding buttons in the browser.
 
 ## Database Migration
 
@@ -111,6 +117,7 @@ The schema currently covers:
 
 - roles and users
 - business dates and shift sessions
+- duplicate-active-session protection for demo users
 - rooms and room status history
 - guest profiles and identification records
 - reservations

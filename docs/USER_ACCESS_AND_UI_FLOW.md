@@ -450,7 +450,9 @@
   - Assigned role.
   - Current shift.
   - Business date.
-- Operational activity records are labeled with the user and shift performing the action.
+- When PostgreSQL is configured, sign-in creates an active server-side `shift_sessions` record.
+- The browser remembers the active session identifier locally and validates it after refresh.
+- Operational activity records are labeled with the user, role, shift, business date, and session performing the action where the current API supports it.
 
 ### Change Shift / Handover
 
@@ -468,20 +470,28 @@
 - On transfer:
   - Active operator and role change to the incoming employee.
   - Tab access adjusts to the incoming role.
-  - Handover is recorded in session state.
+  - Outgoing server session is closed.
+  - Incoming server session is opened.
+  - Handover is recorded in session state and activity history.
   - Activity log attributes the handover event to the outgoing operator.
 
 ### Sign Out / Sign In
 
 - Operator may select `Sign Out`.
-- System records sign-out in activity history.
+- System closes the active server session and records sign-out in activity history.
 - Operator selection screen is displayed before further work proceeds.
 - New operator selects:
   - Employee identity and assigned role.
   - Active shift.
 - On sign-in:
+  - System opens a new active server session.
+  - System rejects sign-in when the same employee already has an active session in another browser.
   - Accessible tabs update according to role.
   - Sign-in is recorded in activity history.
+- On refresh:
+  - Browser sends the remembered session ID for validation.
+  - If the session is still active, the same operator view is restored.
+  - If the session is missing or closed, the operator must sign in again.
 
 ## Reports Flow
 
@@ -531,9 +541,10 @@
 
 ## Current Prototype Limitations
 
-- User selection demonstrates roles but is not secure authentication.
-- Workstation user/view selection is remembered in browser `localStorage`, but it is not a secure server session.
-- Permissions are still primarily enforced in the UI; a production API must enforce authorization.
+- User selection now creates a server-backed demo session, but it is not secure authentication.
+- Workstation/session identity is remembered in browser `localStorage`, but passwords, MFA, OAuth, and production user administration are not implemented.
+- Duplicate active login is blocked for the same demo operator, but stale-session release and supervisor override are not implemented yet.
+- Write routes require an active session, but the full role permission matrix still needs backend authorization.
 - Other browsers/devices see shared state after refresh, but automatic realtime updates are not implemented yet.
 - Folio workflow presently supports sample charges and settlement payments only.
 - Credit card handling is simulated only; it does not contact a real payment gateway and must never be used for real card processing.
@@ -545,7 +556,7 @@
 
 - Persist core entities:
   - Users, roles, and permissions.
-  - Shift sessions and handovers.
+  - Shift sessions and handovers. Current demo persistence exists; production hardening still needs secure authentication and stronger authorization.
   - Guest profiles.
   - Reservations.
   - Guest nationality data on guest profiles/reservations.
