@@ -165,6 +165,7 @@ const state = {
   pendingCheckInAuthorization: null,
   printableReservationId: null,
   printableStayId: null,
+  apiConnected: false,
   handovers: [],
   paymentMethods: [],
   cardAuthorizations: [],
@@ -273,6 +274,42 @@ const elements = {
   drawerCloseButton: document.querySelector("#drawerCloseButton"),
   sidebarOverlay: document.querySelector("#sidebarOverlay")
 };
+
+async function apiRequest(path, options = {}) {
+  const response = await fetch(path, {
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options
+  });
+  const payload = await response.json();
+  if (!response.ok || payload.ok === false) throw new Error(payload.message || "Request failed.");
+  return payload;
+}
+
+function applyRemoteState(remoteState) {
+  if (!remoteState) return;
+  ["rooms", "reservations", "stays", "paymentMethods", "cardAuthorizations"].forEach((key) => {
+    if (Array.isArray(remoteState[key])) state[key] = remoteState[key];
+  });
+  if (Array.isArray(remoteState.activity) && remoteState.activity.length) state.activity = remoteState.activity;
+  state.apiConnected = true;
+}
+
+async function refreshRemoteState() {
+  const payload = await apiRequest("/api/state");
+  applyRemoteState(payload.state);
+  renderSession();
+}
+
+async function persistMutation(path, options, fallback) {
+  if (!state.apiConnected) {
+    fallback?.();
+    return false;
+  }
+  const payload = await apiRequest(path, options);
+  applyRemoteState(payload.state);
+  renderSession();
+  return true;
+}
 
 function syncTopbarOffset() {
   const topbar = document.querySelector(".topbar");
@@ -634,6 +671,23 @@ function assignAvailableRoom(reservation) {
   return true;
 }
 
+async function assignRoomPersisted(reservation) {
+  try {
+    const assigned = await persistMutation(`/api/reservations/${reservation.id}/assign-room`, { method: "POST" }, () => {
+      if (assignAvailableRoom(reservation)) {
+        renderAll();
+        notify(`${guestName(reservation)} assigned to room ${reservation.room}.`);
+      }
+    });
+    if (assigned) {
+      const updated = state.reservations.find((item) => item.id === reservation.id);
+      notify(`${guestName(updated || reservation)} assigned to room ${(updated || reservation).room}.`);
+    }
+  } catch (error) {
+    notify(error.message);
+  }
+}
+
 function openReservationDetail(id) {
   const reservation = state.reservations.find((item) => item.id === Number(id));
   state.printableReservationId = reservation.id;
@@ -656,14 +710,11 @@ function openReservationDetail(id) {
   openModal(elements.reservationDetailModal);
 }
 
-function beginArrivalAction(id) {
+async function beginArrivalAction(id) {
   if (!hasFrontDeskAccess()) return notify("Your role cannot process arrivals.");
   const reservation = state.reservations.find((item) => item.id === Number(id));
   if (!reservation.room) {
-    if (assignAvailableRoom(reservation)) {
-      renderAll();
-      notify(`${guestName(reservation)} assigned to room ${reservation.room}.`);
-    }
+    await assignRoomPersisted(reservation);
     return;
   }
   const room = state.rooms.find((item) => item.number === reservation.room);
@@ -695,12 +746,33 @@ function beginArrivalAction(id) {
   openModal(elements.checkInModal);
 }
 
-function completeCheckIn() {
+async function completeCheckIn() {
   if (!hasFrontDeskAccess()) return notify("Your role cannot complete check-in.");
   const reservation = state.reservations.find((item) => item.id === state.activeReservationId);
   const room = state.rooms.find((item) => item.number === reservation.room);
+  const paymentMethod = document.querySelector("#checkInPaymentMethod").value;
+  const keysIssued = document.querySelector("#checkInKeys").value;
+  if (state.apiConnected) {
+    try {
+      await persistMutation(`/api/reservations/${reservation.id}/check-in`, {
+        method: "POST",
+        body: JSON.stringify({
+          paymentMethod,
+          keysIssued,
+          authorization: state.pendingCheckInAuthorization
+        })
+      });
+      state.pendingCheckInAuthorization = null;
+      closeModal(elements.checkInModal);
+      notify(`Check-in completed for ${guestName(reservation)}.`);
+      return;
+    } catch (error) {
+      notify(error.message);
+      return;
+    }
+  }
   reservation.status = "checked-in";
-  reservation.paymentMethod = document.querySelector("#checkInPaymentMethod").value;
+  reservation.paymentMethod = paymentMethod;
   room.occupancy = "occupied";
   room.guest = guestName(reservation);
   const lodgingTotal = reservation.nightlyRate * nightsBetween(reservation.arrivalDate, reservation.departureDate);
@@ -726,7 +798,7 @@ function completeCheckIn() {
     }
   }
   state.pendingCheckInAuthorization = null;
-  addActivity(`${guestName(reservation)} checked in`, `Room ${reservation.room} | ${document.querySelector("#checkInKeys").value} key(s) issued`);
+  addActivity(`${guestName(reservation)} checked in`, `Room ${reservation.room} | ${keysIssued} key(s) issued`);
   closeModal(elements.checkInModal);
   renderAll();
   notify(`Check-in completed for ${guestName(reservation)}.`);
@@ -1054,7 +1126,7 @@ elements.newReservationButton.addEventListener("click", () => {
   openModal(elements.reservationModal);
 });
 
-document.querySelector("#reservationForm").addEventListener("submit", (event) => {
+document.querySelector("#reservationForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!hasFrontDeskAccess()) return notify("Reservation access is not assigned to this role.");
   if (!event.target.reportValidity()) return;
@@ -1075,6 +1147,21 @@ document.querySelector("#reservationForm").addEventListener("submit", (event) =>
     ratePlan: values.get("ratePlan"), nightlyRate: Number(values.get("nightlyRate")), paymentMethod: values.get("paymentMethod"),
     phone: values.get("phone"), email: values.get("email"), notes: values.get("notes"), vip: values.get("vip") === "true"
   };
+  if (state.apiConnected) {
+    try {
+      await persistMutation("/api/reservations", {
+        method: "POST",
+        body: JSON.stringify(reservation)
+      });
+      event.target.reset();
+      closeModal(elements.reservationModal);
+      notify("Reservation saved to the shared database.");
+      return;
+    } catch (error) {
+      notify(error.message);
+      return;
+    }
+  }
   state.reservations.push(reservation);
   addActivity("Reservation created", `${guestName(reservation)} - ${reservation.confirmation}`);
   event.target.reset();
@@ -1083,7 +1170,7 @@ document.querySelector("#reservationForm").addEventListener("submit", (event) =>
   notify(`Reservation ${reservation.confirmation} saved.`);
 });
 
-document.querySelector("#postChargeForm").addEventListener("submit", (event) => {
+document.querySelector("#postChargeForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!canPostServices()) return notify("Service charge posting is not assigned to this role.");
   if (!event.target.reportValidity()) return;
@@ -1097,11 +1184,33 @@ document.querySelector("#postChargeForm").addEventListener("submit", (event) => 
   if (amount <= 0) return notify("Charge amount must be greater than zero.");
   const category = values.get("category");
   const reference = values.get("reference").trim() || `SVC-${Date.now().toString().slice(-5)}`;
+  const description = `${category}: ${values.get("description").trim()} x${quantity}`;
+  if (state.apiConnected) {
+    try {
+      await persistMutation(`/api/stays/${stay.id}/service-charge`, {
+        method: "POST",
+        body: JSON.stringify({
+          category,
+          description,
+          amount,
+          reference,
+          notes: values.get("notes").trim()
+        })
+      });
+      closeModal(elements.postChargeModal);
+      event.target.reset();
+      notify(`${formatPeso(amount)} posted to ${stay.guest}'s folio.`);
+      return;
+    } catch (error) {
+      notify(error.message);
+      return;
+    }
+  }
   stay.folio.push({
     type: "Service Charge",
     source: "services",
     category,
-    description: `${category}: ${values.get("description").trim()} x${quantity}`,
+    description,
     amount,
     reference,
     notes: values.get("notes").trim(),
@@ -1139,7 +1248,7 @@ document.querySelector("#checkInCardNumber").addEventListener("input", (event) =
   document.querySelector("#checkInCardBrand").textContent = detectCardBrand(event.target.value);
 });
 
-document.querySelector("#paymentForm").addEventListener("submit", (event) => {
+document.querySelector("#paymentForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!canPostPayments()) return notify("Cashiering access is required.");
   if (!event.target.reportValidity()) return;
@@ -1163,6 +1272,21 @@ document.querySelector("#paymentForm").addEventListener("submit", (event) => {
       authorization.capturedAt = new Date().toISOString();
       description = `${authorization.brand} card capture ${authorization.maskedNumber}`;
       reference = `CAP-${authorization.id.replace("AUTH-", "")}`;
+      if (state.apiConnected) {
+        try {
+          await persistMutation(`/api/stays/${stay.id}/payments`, {
+            method: "POST",
+            body: JSON.stringify({ amount, source, description, reference, authorizationId: authorization.id })
+          });
+          closeModal(elements.paymentModal);
+          event.target.reset();
+          notify(`${formatPeso(amount)} payment posted to ${stay.guest}'s folio.`);
+          return;
+        } catch (error) {
+          notify(error.message);
+          return;
+        }
+      }
       addActivity("Card authorization captured", `${stay.guest} - ${formatPeso(amount)} - ${authorization.id}`);
     } else {
       const cardData = {
@@ -1184,7 +1308,37 @@ document.querySelector("#paymentForm").addEventListener("submit", (event) => {
       authorization.capturedAt = new Date().toISOString();
       description = `${paymentMethod.brand} card sale ${paymentMethod.maskedNumber}`;
       reference = `SALE-${authorization.id.replace("AUTH-", "")}`;
+      if (state.apiConnected) {
+        try {
+          await persistMutation(`/api/stays/${stay.id}/payments`, {
+            method: "POST",
+            body: JSON.stringify({ amount, source, description, reference, authorization })
+          });
+          closeModal(elements.paymentModal);
+          event.target.reset();
+          notify(`${formatPeso(amount)} payment posted to ${stay.guest}'s folio.`);
+          return;
+        } catch (error) {
+          notify(error.message);
+          return;
+        }
+      }
       addActivity("Card payment approved", `${stay.guest} - ${formatPeso(amount)} - ${authorization.id}`);
+    }
+  }
+  if (state.apiConnected) {
+    try {
+      await persistMutation(`/api/stays/${stay.id}/payments`, {
+        method: "POST",
+        body: JSON.stringify({ amount, source, description, reference })
+      });
+      closeModal(elements.paymentModal);
+      event.target.reset();
+      notify(`${formatPeso(amount)} payment posted to ${stay.guest}'s folio.`);
+      return;
+    } catch (error) {
+      notify(error.message);
+      return;
     }
   }
   stay.folio.push({ type: "Payment", source, description, amount: -amount, reference });
@@ -1194,9 +1348,9 @@ document.querySelector("#paymentForm").addEventListener("submit", (event) => {
   notify(`${formatPeso(amount)} payment posted to ${stay.guest}'s folio.`);
 });
 
-document.querySelector("#checkInForm").addEventListener("submit", (event) => {
+document.querySelector("#checkInForm").addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (event.target.reportValidity()) completeCheckIn();
+  if (event.target.reportValidity()) await completeCheckIn();
 });
 
 document.querySelector("#authorizeCardButton").addEventListener("click", () => {
@@ -1243,26 +1397,39 @@ elements.roomRack.addEventListener("click", (event) => {
   if (button) openRoom(button.dataset.room);
 });
 
-document.querySelector("#roomForm").addEventListener("submit", (event) => {
+document.querySelector("#roomForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!canUpdateHousekeeping() && !canUpdateMaintenance()) return notify("You have view-only access to room operations.");
   const room = state.activeRoom;
-  if (canUpdateHousekeeping()) room.housekeeping = document.querySelector("#roomHousekeepingSelect").value;
-  if (canUpdateMaintenance()) room.maintenance = document.querySelector("#roomMaintenanceSelect").value;
+  const housekeeping = canUpdateHousekeeping() ? document.querySelector("#roomHousekeepingSelect").value : room.housekeeping;
+  const maintenance = canUpdateMaintenance() ? document.querySelector("#roomMaintenanceSelect").value : room.maintenance;
+  if (state.apiConnected) {
+    try {
+      await persistMutation(`/api/rooms/${encodeURIComponent(room.number)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ housekeeping, maintenance })
+      });
+      closeModal(elements.roomModal);
+      notify(`Operations status updated for room ${room.number}.`);
+      return;
+    } catch (error) {
+      notify(error.message);
+      return;
+    }
+  }
+  room.housekeeping = housekeeping;
+  room.maintenance = maintenance;
   addActivity(`Room ${room.number} status updated`, `${housekeepingLabels[room.housekeeping]} / ${maintenanceLabels[room.maintenance]}`);
   closeModal(elements.roomModal);
   renderAll();
   notify(`Operations status updated for room ${room.number}.`);
 });
 
-elements.assignRoomButton.addEventListener("click", () => {
+elements.assignRoomButton.addEventListener("click", async () => {
   if (!hasFrontDeskAccess()) return notify("Room assignment is restricted for this role.");
   const pending = dueInReservations().find((reservation) => !reservation.room);
   if (!pending) return notify("All due-in reservations already have assigned rooms.");
-  if (assignAvailableRoom(pending)) {
-    renderAll();
-    notify(`Room ${pending.room} assigned to ${guestName(pending)}.`);
-  }
+  await assignRoomPersisted(pending);
 });
 
 document.querySelector("#showAllRooms").addEventListener("click", () => notify(`${state.rooms.length} rooms displayed in the current rack.`));
@@ -1280,6 +1447,13 @@ elements.moduleWorkspace.addEventListener("click", (event) => {
   if (event.target.dataset.cleanRoom) {
     if (!canUpdateHousekeeping()) return notify("Housekeeping update permission is required.");
     const room = state.rooms.find((item) => item.number === event.target.dataset.cleanRoom);
+    if (state.apiConnected) {
+      persistMutation(`/api/rooms/${encodeURIComponent(room.number)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ housekeeping: "inspected", maintenance: room.maintenance })
+      }).then(() => notify(`Room ${room.number} is now inspected.`)).catch((error) => notify(error.message));
+      return;
+    }
     room.housekeeping = "inspected";
     addActivity(`Room ${room.number} inspected`, "Housekeeping marked the room inspected.");
     renderAll();
@@ -1293,6 +1467,12 @@ elements.moduleWorkspace.addEventListener("click", (event) => {
     if (!permitted("departures")) return notify("Departure access is required.");
     const stay = state.stays.find((item) => item.id === Number(event.target.dataset.checkOut));
     if (balanceFor(stay) !== 0) return notify("Settle the folio balance before check-out.");
+    if (state.apiConnected) {
+      persistMutation(`/api/stays/${stay.id}/check-out`, { method: "POST" })
+        .then(() => notify(`Check-out completed. Room ${stay.room} is vacant dirty.`))
+        .catch((error) => notify(error.message));
+      return;
+    }
     stay.status = "checked-out";
     const room = state.rooms.find((item) => item.number === stay.room);
     room.occupancy = "vacant";
@@ -1383,5 +1563,16 @@ elements.loginModal.addEventListener("cancel", (event) => {
   if (!state.session.signedIn) event.preventDefault();
 });
 
-renderSession();
-syncTopbarOffset();
+async function initializeApp() {
+  renderSession();
+  syncTopbarOffset();
+  try {
+    await refreshRemoteState();
+    notify("Shared database state loaded.");
+  } catch (error) {
+    state.apiConnected = false;
+    console.info("Using local demo state:", error.message);
+  }
+}
+
+initializeApp();
