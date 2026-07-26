@@ -569,7 +569,8 @@ async function handleSessionRoute(req, res, requestPath) {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      const session = await closeOperatorSession(client, body.sessionId);
+      const sessionId = body.sessionId || getRequestSessionId(req);
+      const session = await closeOperatorSession(client, sessionId);
       await logAudit(client, "operator_logout", "shift_session", session.sessionId, `${session.user} signed out`, session);
       await client.query("commit");
       sendJson(res, 200, { ok: true });

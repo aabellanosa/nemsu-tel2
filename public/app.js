@@ -1651,22 +1651,23 @@ document.querySelector("#handoverForm").addEventListener("submit", (event) => {
   notify(`${state.session.shift} shift opened for ${state.session.user}.`);
 });
 
-document.querySelector("#signOutButton").addEventListener("click", () => {
+document.querySelector("#signOutButton").addEventListener("click", async () => {
   if (!state.session.signedIn) return;
   const signedOutUser = state.session.user;
   if (state.apiConnected && state.session.sessionId) {
-    apiRequest("/api/session/logout", {
-      method: "POST",
-      body: JSON.stringify({ sessionId: state.session.sessionId })
-    }).catch((error) => {
-      console.info("Session logout warning:", error.message);
-    }).finally(() => {
+    try {
+      await apiRequest("/api/session/logout", {
+        method: "POST",
+        body: JSON.stringify({ sessionId: state.session.sessionId })
+      });
       addActivity("Operator signed out", `${signedOutUser} closed access to this workstation.`);
       applySession(null);
       clearWorkstationState();
       renderSession();
       openModal(elements.loginModal);
-    });
+    } catch (error) {
+      notify(`Sign out failed: ${error.message}`);
+    }
     return;
   }
   addActivity("Operator signed out", `${state.session.user} closed access to this workstation.`);
