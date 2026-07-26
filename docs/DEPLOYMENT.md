@@ -2,6 +2,8 @@
 
 This project currently deploys the non-persistent browser prototype by uploading the built `public/` folder to a Namecheap-hosted subdomain.
 
+For the Render/PostgreSQL migration, see [Render + PostgreSQL Migration](RENDER_POSTGRES_MIGRATION.md).
+
 ## GitHub Actions Flow
 
 - Push to `main`.

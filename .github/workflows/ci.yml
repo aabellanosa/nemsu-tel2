@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - render-postgres-migration
   pull_request:
     branches:
       - main
@@ -43,6 +44,12 @@ jobs:
 
       - name: Check browser app syntax
         run: node --check public/app.js
+
+      - name: Check migration script syntax
+        run: node --check scripts/db-migrate.js
+
+      - name: Check seed script syntax
+        run: node --check scripts/db-seed.js
 
       - name: Deploy public folder to Namecheap
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.FTP_SERVER != '' && env.FTP_USERNAME != '' && env.FTP_PASSWORD != '' && env.FTP_SERVER_DIR != ''
