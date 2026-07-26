@@ -77,7 +77,16 @@ function toDbMaintenanceStatus(value) {
 
 function formatDateOnly(value) {
   if (!value) return null;
-  return new Date(value).toISOString().slice(0, 10);
+  if (typeof value === "string") return value.slice(0, 10);
+  return [
+    value.getFullYear(),
+    String(value.getMonth() + 1).padStart(2, "0"),
+    String(value.getDate()).padStart(2, "0")
+  ].join("-");
+}
+
+function toNumberOrNull(value) {
+  return value == null ? null : Number(value);
 }
 
 function readJsonBody(req) {
@@ -136,6 +145,7 @@ async function fetchRooms(client = pool) {
   `);
   return result.rows.map((room) => ({
     ...room,
+    id: toNumberOrNull(room.id),
     maintenance: toUiMaintenanceStatus(room.maintenance_status),
     maintenance_status: undefined
   }));
@@ -175,9 +185,12 @@ async function fetchReservations(client = pool) {
   `);
   return result.rows.map((reservation) => ({
     ...reservation,
+    id: toNumberOrNull(reservation.id),
     status: toKebabStatus(reservation.status),
     arrivalDate: formatDateOnly(reservation.arrivalDate),
     departureDate: formatDateOnly(reservation.departureDate),
+    adults: Number(reservation.adults),
+    children: Number(reservation.children),
     nightlyRate: Number(reservation.nightlyRate)
   }));
 }
@@ -226,14 +239,14 @@ async function fetchStays(client = pool) {
     order by stays.status, stays.id desc
   `);
   return result.rows.map((stay) => ({
-    id: stay.id,
-    reservationId: stay.reservationId,
+    id: toNumberOrNull(stay.id),
+    reservationId: toNumberOrNull(stay.reservationId),
     guest: stay.guest,
     room: stay.room,
     roomType: stay.reservationRoomType || { STD: "Standard Queen", DLX: "Deluxe", STE: "Executive Suite" }[stay.roomTypeCode] || stay.roomTypeCode,
     departureDate: formatDateOnly(stay.departureDate),
     status: toKebabStatus(stay.status),
-    folio: stay.folio.map((item) => ({ ...item, amount: Number(item.amount) }))
+    folio: stay.folio.map((item) => ({ ...item, id: toNumberOrNull(item.id), amount: Number(item.amount) }))
   }));
 }
 
@@ -274,9 +287,17 @@ async function fetchCardData(client = pool) {
   ]);
 
   return {
-    paymentMethods: methods.rows,
+    paymentMethods: methods.rows.map((method) => ({
+      ...method,
+      id: toNumberOrNull(method.id),
+      reservationId: toNumberOrNull(method.reservationId),
+      stayId: toNumberOrNull(method.stayId)
+    })),
     cardAuthorizations: authorizations.rows.map((authorization) => ({
       ...authorization,
+      paymentMethodId: toNumberOrNull(authorization.paymentMethodId),
+      reservationId: toNumberOrNull(authorization.reservationId),
+      stayId: toNumberOrNull(authorization.stayId),
       amount: Number(authorization.amount)
     }))
   };
@@ -356,8 +377,52 @@ async function createCardAuthorization(client, authorization, links = {}) {
   );
 }
 
+async function resetDemoData() {
+  const resetSql = `
+    truncate table
+      audit_events,
+      card_authorizations,
+      card_payment_methods,
+      folio_transactions,
+      folios,
+      stays,
+      reservations,
+      guest_identifications,
+      guest_profiles,
+      room_status_history,
+      shift_sessions,
+      business_dates,
+      users,
+      roles,
+      service_categories,
+      rooms
+    restart identity cascade;
+  `;
+  const seedPath = path.join(__dirname, "db", "seed.sql");
+  const seedSql = fs.readFileSync(seedPath, "utf8");
+
+  await pool.query(resetSql);
+  await pool.query(seedSql);
+}
+
 async function handleMutation(req, res, requestPath) {
   const body = await readJsonBody(req);
+
+  if (req.method === "POST" && requestPath === "/api/demo/reset") {
+    if (process.env.DEMO_RESET_ENABLED === "false") {
+      sendJson(res, 403, { ok: false, message: "Demo reset is disabled for this deployment." });
+      return true;
+    }
+
+    try {
+      await resetDemoData();
+      await logAudit(pool, "demo_reset", "system", null, "Demo data reset to practicum baseline");
+      sendJson(res, 200, { ok: true, state: await fetchAppState() });
+    } catch (error) {
+      sendJson(res, 500, { ok: false, message: error.message });
+    }
+    return true;
+  }
 
   if (req.method === "POST" && requestPath === "/api/reservations") {
     const client = await pool.connect();

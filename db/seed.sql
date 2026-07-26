@@ -20,7 +20,7 @@ on conflict (username) do update set
   is_active = true;
 
 insert into business_dates (business_date, status)
-values (current_date, 'open')
+values ((now() at time zone 'Asia/Manila')::date, 'open')
 on conflict (business_date) do nothing;
 
 insert into service_categories (name) values
@@ -70,7 +70,7 @@ identification as (
 )
 insert into reservations
   (confirmation_number, guest_profile_id, status, arrival_date, departure_date, eta, requested_room_type, assigned_room_id, adults, children, rate_plan, nightly_rate, payment_method, notes)
-select 'GH-28491', guest.id, 'due_in', current_date, current_date + interval '2 days', '12:30 PM', 'Executive Suite', rooms.id, 2, 0, 'BAR', 7200, 'Credit Card Guarantee', 'High floor preferred.'
+select 'GH-28491', guest.id, 'due_in', (now() at time zone 'Asia/Manila')::date, (now() at time zone 'Asia/Manila')::date + interval '2 days', '12:30 PM', 'Executive Suite', rooms.id, 2, 0, 'BAR', 7200, 'Credit Card Guarantee', 'High floor preferred.'
 from guest
 join rooms on rooms.room_number = '402';
 
@@ -86,7 +86,7 @@ identification as (
 )
 insert into reservations
   (confirmation_number, guest_profile_id, status, arrival_date, departure_date, eta, requested_room_type, assigned_room_id, adults, children, rate_plan, nightly_rate, payment_method, notes)
-select 'GH-28506', guest.id, 'due_in', current_date, current_date + interval '1 day', '2:00 PM', 'Deluxe King', rooms.id, 1, 0, 'CORP', 4800, 'Direct Bill', null
+select 'GH-28506', guest.id, 'due_in', (now() at time zone 'Asia/Manila')::date, (now() at time zone 'Asia/Manila')::date + interval '1 day', '2:00 PM', 'Deluxe King', rooms.id, 1, 0, 'CORP', 4800, 'Direct Bill', null
 from guest
 join rooms on rooms.room_number = '318';
 
@@ -102,7 +102,7 @@ identification as (
 )
 insert into reservations
   (confirmation_number, guest_profile_id, status, arrival_date, departure_date, eta, requested_room_type, adults, children, rate_plan, nightly_rate, payment_method, notes)
-select 'GH-28524', id, 'due_in', current_date, current_date + interval '3 days', '3:15 PM', 'Deluxe Twin', 2, 1, 'BAR', 5250, 'Pay at Hostel', 'Late checkout requested.'
+select 'GH-28524', id, 'due_in', (now() at time zone 'Asia/Manila')::date, (now() at time zone 'Asia/Manila')::date + interval '3 days', '3:15 PM', 'Deluxe Twin', 2, 1, 'BAR', 5250, 'Pay at Hostel', 'Late checkout requested.'
 from guest;
 
 with guest as (
@@ -117,8 +117,47 @@ identification as (
 )
 insert into reservations
   (confirmation_number, guest_profile_id, status, arrival_date, departure_date, eta, requested_room_type, adults, children, rate_plan, nightly_rate, payment_method, notes)
-select 'GH-28538', id, 'due_in', current_date, current_date + interval '1 day', '5:30 PM', 'Standard Queen', 1, 0, 'BAR', 3900, 'Cash Deposit', null
+select 'GH-28538', id, 'due_in', (now() at time zone 'Asia/Manila')::date, (now() at time zone 'Asia/Manila')::date + interval '1 day', '5:30 PM', 'Standard Queen', 1, 0, 'BAR', 3900, 'Cash Deposit', null
 from guest;
+
+with arrival_refresh(confirmation_number, departure_offset, eta, requested_room_type, assigned_room_number, adults, children, rate_plan, nightly_rate, payment_method, notes) as (
+  values
+    ('GH-28491', 2, '12:30 PM', 'Executive Suite', '402', 2, 0, 'BAR', 7200::numeric, 'Credit Card Guarantee', 'High floor preferred.'),
+    ('GH-28506', 1, '2:00 PM', 'Deluxe King', '318', 1, 0, 'CORP', 4800::numeric, 'Direct Bill', null),
+    ('GH-28524', 3, '3:15 PM', 'Deluxe Twin', null, 2, 1, 'BAR', 5250::numeric, 'Pay at Hostel', 'Late checkout requested.'),
+    ('GH-28538', 1, '5:30 PM', 'Standard Queen', null, 1, 0, 'BAR', 3900::numeric, 'Cash Deposit', null)
+)
+update reservations
+set
+  status = 'due_in',
+  arrival_date = (now() at time zone 'Asia/Manila')::date,
+  departure_date = (now() at time zone 'Asia/Manila')::date + (arrival_refresh.departure_offset || ' days')::interval,
+  eta = arrival_refresh.eta,
+  requested_room_type = arrival_refresh.requested_room_type,
+  assigned_room_id = coalesce(rooms.id, reservations.assigned_room_id),
+  adults = arrival_refresh.adults,
+  children = arrival_refresh.children,
+  rate_plan = arrival_refresh.rate_plan,
+  nightly_rate = arrival_refresh.nightly_rate,
+  payment_method = arrival_refresh.payment_method,
+  notes = arrival_refresh.notes
+from arrival_refresh
+left join rooms on rooms.room_number = arrival_refresh.assigned_room_number
+where reservations.confirmation_number = arrival_refresh.confirmation_number
+  and reservations.status in ('reserved', 'due_in', 'cancelled', 'no_show');
+
+with assigned_arrivals(room_number, guest_name) as (
+  values
+    ('402', 'Alicia Fernandez'),
+    ('318', 'Robert Delgado')
+)
+update rooms
+set
+  occupancy_status = 'assigned',
+  current_guest_name = assigned_arrivals.guest_name
+from assigned_arrivals
+where rooms.room_number = assigned_arrivals.room_number
+  and rooms.occupancy_status <> 'occupied';
 
 with demo_stays(first_name, last_name, room_number, room_type, departure_offset, room_charge, payment_amount, charge_reference, payment_reference) as (
   values
@@ -143,7 +182,7 @@ inserted_guests as (
 ),
 inserted_stays as (
   insert into stays (guest_profile_id, room_id, departure_date)
-  select inserted_guests.id, rooms.id, current_date + (demo_stays.departure_offset || ' days')::interval
+  select inserted_guests.id, rooms.id, (now() at time zone 'Asia/Manila')::date + (demo_stays.departure_offset || ' days')::interval
   from inserted_guests
   join demo_stays on demo_stays.first_name = inserted_guests.first_name and demo_stays.last_name = inserted_guests.last_name
   join rooms on rooms.room_number = demo_stays.room_number

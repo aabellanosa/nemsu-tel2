@@ -275,6 +275,8 @@ const elements = {
   sidebarOverlay: document.querySelector("#sidebarOverlay")
 };
 
+const workstationStateKey = "hmsystem.workstation";
+
 async function apiRequest(path, options = {}) {
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -309,6 +311,36 @@ async function persistMutation(path, options, fallback) {
   applyRemoteState(payload.state);
   renderSession();
   return true;
+}
+
+function loadWorkstationState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(workstationStateKey) || "{}");
+    if (saved.session && saved.session.user && saved.session.role && saved.session.shift) {
+      state.session = {
+        user: saved.session.user,
+        role: saved.session.role,
+        shift: saved.session.shift,
+        signedIn: saved.session.signedIn !== false
+      };
+    }
+    if (saved.activeView && viewLabels[saved.activeView]) {
+      state.activeView = saved.activeView;
+    }
+  } catch {
+    localStorage.removeItem(workstationStateKey);
+  }
+}
+
+function saveWorkstationState() {
+  try {
+    localStorage.setItem(workstationStateKey, JSON.stringify({
+      session: state.session,
+      activeView: state.activeView
+    }));
+  } catch {
+    // Storage may be blocked in some private/restricted browser modes.
+  }
 }
 
 function syncTopbarOffset() {
@@ -600,6 +632,13 @@ function renderReportsWorkspace() {
       <div class="report-grid">
         ${["Arrival Forecast", "Room State Summary", "Cashier Ledger", "Services Summary", "Departure List"].map((report) => `<div class="report-tile"><strong>${report}</strong><p>Generated for the current business date.</p><button class="text-button" data-report="${report}">Generate Report</button></div>`).join("")}
       </div>
+    </article>
+    <article class="panel workspace-panel">
+      <div class="panel-heading">
+        <div><p class="eyebrow">Demo Sandbox</p><h3>Reset Practicum Dataset</h3></div>
+        <button class="secondary-button" data-reset-demo="true">Reset Demo Data</button>
+      </div>
+      <p class="muted">Restores the initial rooms, arrivals, in-house guests, departures, folios, and service categories used for student testing.</p>
     </article>`;
 }
 
@@ -655,6 +694,7 @@ function renderSession() {
   elements.assignRoomButton.classList.toggle("hidden", !hasFrontDeskAccess());
   renderAll();
   syncTopbarOffset();
+  saveWorkstationState();
 }
 
 function assignAvailableRoom(reservation) {
@@ -690,6 +730,7 @@ async function assignRoomPersisted(reservation) {
 
 function openReservationDetail(id) {
   const reservation = state.reservations.find((item) => item.id === Number(id));
+  if (!reservation) return notify("Reservation record was not found. Refresh and try again.");
   state.printableReservationId = reservation.id;
   document.querySelector("#reservationDetailTitle").textContent = `${guestName(reservation)} | ${reservation.confirmation}`;
   document.querySelector("#reservationDetailContent").innerHTML = `
@@ -713,6 +754,7 @@ function openReservationDetail(id) {
 async function beginArrivalAction(id) {
   if (!hasFrontDeskAccess()) return notify("Your role cannot process arrivals.");
   const reservation = state.reservations.find((item) => item.id === Number(id));
+  if (!reservation) return notify("Reservation record was not found. Refresh and try again.");
   if (!reservation.room) {
     await assignRoomPersisted(reservation);
     return;
@@ -821,6 +863,7 @@ function openRoom(number) {
 
 function openFolio(stayId) {
   const stay = state.stays.find((item) => item.id === Number(stayId));
+  if (!stay) return notify("Folio record was not found. Refresh and try again.");
   state.printableStayId = stay.id;
   document.querySelector("#folioModalTitle").textContent = `${stay.guest} | Room ${stay.room}`;
   const auths = authorizationsForStay(stay.id);
@@ -911,6 +954,7 @@ function openPayment(stayId) {
     return;
   }
   const stay = state.stays.find((item) => item.id === Number(stayId));
+  if (!stay) return notify("Stay record was not found. Refresh and try again.");
   state.activePaymentStayId = stay.id;
   const balance = balanceFor(stay);
   document.querySelector("#paymentOverview").innerHTML = `
@@ -1488,6 +1532,18 @@ elements.moduleWorkspace.addEventListener("click", (event) => {
     printReport(event.target.dataset.report);
     notify(`${event.target.dataset.report} opened for printing.`);
   }
+  if (event.target.dataset.resetDemo) {
+    if (!permitted("reports")) return notify("Reporting access is required.");
+    if (!state.apiConnected) return notify("Demo reset requires the shared database connection.");
+    if (!window.confirm("Reset all practicum demo data to the initial arrivals, rooms, in-house guests, and folios?")) return;
+    event.target.disabled = true;
+    persistMutation("/api/demo/reset", { method: "POST" })
+      .then(() => notify("Demo data reset to the practicum baseline."))
+      .catch((error) => notify(error.message))
+      .finally(() => {
+        event.target.disabled = false;
+      });
+  }
 });
 
 document.querySelector("#globalSearch").addEventListener("input", (event) => {
@@ -1564,14 +1620,14 @@ elements.loginModal.addEventListener("cancel", (event) => {
 });
 
 async function initializeApp() {
-  renderSession();
-  syncTopbarOffset();
+  loadWorkstationState();
   try {
     await refreshRemoteState();
-    notify("Shared database state loaded.");
   } catch (error) {
     state.apiConnected = false;
     console.info("Using local demo state:", error.message);
+    renderSession();
+    syncTopbarOffset();
   }
 }
 
