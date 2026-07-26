@@ -20,13 +20,21 @@ function loadLocalEnv() {
 
 loadLocalEnv();
 
+function getDatabaseSslConfig(connectionString) {
+  if (process.env.DATABASE_SSL === "false") return false;
+
+  const host = new URL(connectionString).hostname;
+  const isLocalDatabase = host === "localhost" || host === "127.0.0.1" || host === "::1";
+  return isLocalDatabase ? false : { rejectUnauthorized: false };
+}
+
 const publicDir = path.join(__dirname, "public");
 const port = Number(process.env.PORT) || 3000;
 const databaseUrl = process.env.DATABASE_URL;
 const pool = databaseUrl
   ? new Pool({
       connectionString: databaseUrl,
-      ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false
+      ssl: getDatabaseSslConfig(databaseUrl)
     })
   : null;
 const contentTypes = {
