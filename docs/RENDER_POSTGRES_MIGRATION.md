@@ -19,11 +19,26 @@ This branch migrates HMSystem from a static Namecheap prototype toward a shared 
 
 ## Local Development
 
-Create a local `.env` from `.env.example` if you want to test PostgreSQL locally.
+Create a local `.env` from `.env.example` for local PostgreSQL testing.
 
 ```powershell
 copy .env.example .env
 ```
+
+Recommended local database target:
+
+```env
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/hmsystem_local
+DATABASE_SSL=false
+```
+
+Check the active target before local tests or migrations:
+
+```powershell
+npm run db:where
+```
+
+If this prints `Database target: render`, local testing will share state with the deployed Render app. That is useful for deliberate remote verification, but it can also make local operator sessions block remote sign-ins.
 
 Run the app:
 
@@ -56,6 +71,8 @@ Without `DATABASE_URL`, these return HTTP `503` with `DATABASE_URL is not config
 - a Node web service named `hmsystem`
 - a PostgreSQL database named `hmsystem-postgres`
 - `DATABASE_URL` injected from the Render database connection string
+
+Local `.env` is not used by Render. Keep local `.env` pointed at local PostgreSQL for routine development, and keep Render's database URL configured only in Render.
 
 Render build command:
 

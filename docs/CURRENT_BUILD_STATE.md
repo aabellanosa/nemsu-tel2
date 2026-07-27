@@ -78,7 +78,9 @@ npm run watch:css
 ## Local Environment Variables
 
 - Create `.env` from `.env.example`.
-- Use Render's External Database URL when testing locally against the hosted Render PostgreSQL database.
+- For ordinary local testing, point `.env` at a local PostgreSQL database.
+- Let Render inject its own `DATABASE_URL` for the deployed app.
+- Use Render's External Database URL locally only when intentionally testing the exact deployed/shared database.
 - Do not commit `.env`.
 
 Required / useful values:
@@ -86,7 +88,7 @@ Required / useful values:
 ```env
 PORT=3000
 NODE_ENV=development
-DATABASE_URL=postgres://user:password@host:5432/database
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/hmsystem_local
 DATABASE_SSL=false
 DEMO_RESET_ENABLED=true
 ```
@@ -94,11 +96,19 @@ DEMO_RESET_ENABLED=true
 Notes:
 
 - `DATABASE_URL` enables shared persistent state.
+- Local and remote browsers will share sessions if both point to the same Render database.
+- Run `npm run db:where` before testing when unsure which database is active.
 - For Render external PostgreSQL URLs, SSL is detected automatically by the app.
 - `DATABASE_SSL=false` is mainly for a local non-SSL Postgres server.
 - `DEMO_RESET_ENABLED=false` disables the practicum reset endpoint.
 
 ## Database Setup
+
+- Confirm the configured database target:
+
+```powershell
+npm run db:where
+```
 
 - Run schema migration:
 

@@ -48,12 +48,29 @@ npm run watch:css
 
 ## Database
 
-For shared state, configure `DATABASE_URL` in `.env` using the Render External Database URL or another PostgreSQL database.
+For local development, configure `.env` to use a local PostgreSQL database. The Render deployment should keep using the Render-managed `DATABASE_URL` injected by `render.yaml`.
+
+Recommended local shape:
+
+```env
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/hmsystem_local
+DATABASE_SSL=false
+```
+
+Check which database your current terminal will use:
+
+```powershell
+npm run db:where
+```
+
+Run local migration and seed against that target:
 
 ```powershell
 npm run db:migrate
 npm run db:seed
 ```
+
+Avoid pointing local `.env` at the Render External Database URL during ordinary testing, because local and deployed sessions will share the same operator locks and PMS state.
 
 Useful local checks:
 
