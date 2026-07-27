@@ -88,7 +88,7 @@ Required / useful values:
 ```env
 PORT=3000
 NODE_ENV=development
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/hmsystem_local
+DATABASE_URL=postgres://postgres:YOUR_LOCAL_POSTGRES_PASSWORD@localhost:5432/pmsystem_local
 DATABASE_SSL=false
 DEMO_RESET_ENABLED=true
 ```
@@ -248,16 +248,15 @@ npm run db:seed
 
 ## Next Logical Build Series
 
-Recommended next series: `Backend Permissions and Audit Hardening`.
+Recommended next series: `Session and Audit Hardening`.
 
 Suggested order:
 
-1. Enforce role permissions on the backend for each write route.
-2. Add a supervisor-only stale-session release or duplicate-login override.
-3. Harden audit detail for previous/new values on sensitive actions.
-4. Add a manual `Refresh State` control.
-5. Add friendly stale-state/conflict messages.
-6. Add optional polling or realtime refresh for concurrent users.
+1. Add a supervisor-only stale-session release or duplicate-login override.
+2. Harden audit detail for previous/new values on sensitive actions.
+3. Add a manual `Refresh State` control.
+4. Add friendly stale-state/conflict messages.
+5. Add optional polling or realtime refresh for concurrent users.
 
 ## Operator Session Test Run
 

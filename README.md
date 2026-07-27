@@ -53,7 +53,7 @@ For local development, configure `.env` to use a local PostgreSQL database. The 
 Recommended local shape:
 
 ```env
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/hmsystem_local
+DATABASE_URL=postgres://postgres:YOUR_LOCAL_POSTGRES_PASSWORD@localhost:5432/pmsystem_local
 DATABASE_SSL=false
 ```
 

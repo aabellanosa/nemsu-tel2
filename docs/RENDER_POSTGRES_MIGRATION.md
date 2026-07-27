@@ -28,7 +28,7 @@ copy .env.example .env
 Recommended local database target:
 
 ```env
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/hmsystem_local
+DATABASE_URL=postgres://postgres:YOUR_LOCAL_POSTGRES_PASSWORD@localhost:5432/pmsystem_local
 DATABASE_SSL=false
 ```
 
@@ -99,16 +99,21 @@ Completed:
 7. Block duplicate active sessions for the same demo operator.
 8. Attach active session context to core API write actions.
 
+Completed authorization hardening:
+
+1. Current operational write routes enforce named backend permissions.
+2. Authenticated sessions return permissions to keep UI behavior aligned.
+3. Unauthorized actions return `403 Forbidden`.
+
 Next:
 
-1. Enforce role permissions in the backend.
-2. Add supervisor-only stale-session release or duplicate-login override.
-3. Harden operator/session audit detail for every write.
-4. Add manual refresh, polling, or realtime refresh so concurrent users see shared state without browser reload.
+1. Add supervisor-only stale-session release or duplicate-login override.
+2. Harden operator/session audit detail for every write.
+3. Add manual refresh, polling, or realtime refresh so concurrent users see shared state without browser reload.
 
 ## Important Boundary
 
-The current UI role system is no longer purely browser-side because write routes require an active server session. Full role authorization still needs to be enforced in `server.js` or backend route modules, not only by hiding buttons in the browser.
+The role system is not purely browser-side: write routes require an active server session and enforce named permissions in `server.js`. UI visibility remains a usability layer; backend checks are the security boundary.
 
 ## Database Migration
 
