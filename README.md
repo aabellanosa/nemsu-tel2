@@ -122,4 +122,4 @@ The current shared database state is organized around these PostgreSQL-backed co
 - Shift sessions track demo operator sign-in, sign-out, and handover.
 - Core write routes require an active operator session when PostgreSQL is configured.
 
-Role controls still need full backend enforcement. The next recommended build slice is backend permission hardening, stale-session release/override, and stronger audit detail.
+Role controls are enforced by the backend for current operational write routes. The next recommended build slice is stale-session release/override and stronger audit detail.

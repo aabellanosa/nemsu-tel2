@@ -544,7 +544,7 @@
 - User selection now creates a server-backed demo session, but it is not secure authentication.
 - Workstation/session identity is remembered in browser `localStorage`, but passwords, MFA, OAuth, and production user administration are not implemented.
 - Duplicate active login is blocked for the same demo operator, but stale-session release and supervisor override are not implemented yet.
-- Write routes require an active session, but the full role permission matrix still needs backend authorization.
+- Write routes require an active session and enforce the documented role permission matrix in the backend.
 - Other browsers/devices see shared state after refresh, but automatic realtime updates are not implemented yet.
 - Folio workflow presently supports sample charges and settlement payments only.
 - Credit card handling is simulated only; it does not contact a real payment gateway and must never be used for real card processing.
@@ -567,5 +567,5 @@
   - Room-type add-on pricing for items such as additional beds.
   - Audit events.
   - Business-date configuration.
-- Enforce role permissions in Node.js API routes rather than relying on visible tab access alone.
+- Keep backend permissions and visible UI access aligned as new workflows are introduced.
 - Keep folio entries and audit events append-oriented so historical accountability is preserved.

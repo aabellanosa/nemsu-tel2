@@ -120,6 +120,51 @@ function getRequestSessionId(req) {
   return value ? Number(value) : null;
 }
 
+const rolePermissions = Object.freeze({
+  "Front Desk Agent": [
+    "reservation.create",
+    "room.assign",
+    "guest.check_in",
+    "service_charge.post",
+    "guest.check_out"
+  ],
+  "Front Desk Supervisor": [
+    "reservation.create",
+    "room.assign",
+    "guest.check_in",
+    "room.housekeeping.update",
+    "room.maintenance.update",
+    "service_charge.post",
+    "payment.post",
+    "guest.check_out",
+    "report.view",
+    "demo.reset"
+  ],
+  Cashier: [
+    "service_charge.post",
+    "payment.post",
+    "guest.check_out"
+  ],
+  "Housekeeping Supervisor": [
+    "room.housekeeping.update"
+  ],
+  "Night Auditor": [
+    "service_charge.post",
+    "payment.post",
+    "guest.check_out",
+    "report.view",
+    "demo.reset"
+  ]
+});
+
+function permissionsForRole(role) {
+  return [...(rolePermissions[role] || [])];
+}
+
+function hasPermission(session, permission) {
+  return permissionsForRole(session?.role).includes(permission);
+}
+
 function requireDatabase(res) {
   if (pool) return true;
   sendJson(res, 503, { ok: false, message: "DATABASE_URL is not configured" });
@@ -361,7 +406,8 @@ async function fetchSession(sessionId, client = pool) {
     userId: toNumberOrNull(session.userId),
     businessDateId: toNumberOrNull(session.businessDateId),
     businessDate: formatDateOnly(session.businessDate),
-    signedIn: session.status === "active"
+    signedIn: session.status === "active",
+    permissions: permissionsForRole(session.role)
   };
 }
 
@@ -369,6 +415,19 @@ async function requireActiveSession(req, res, client = pool) {
   const session = await fetchSession(getRequestSessionId(req), client);
   if (session && session.signedIn) return session;
   sendJson(res, 401, { ok: false, message: "Active operator session is required. Please sign in again." });
+  return null;
+}
+
+async function requirePermission(req, res, permission, client = pool) {
+  const session = await requireActiveSession(req, res, client);
+  if (!session) return null;
+  if (hasPermission(session, permission)) return session;
+  sendJson(res, 403, {
+    ok: false,
+    code: "FORBIDDEN",
+    permission,
+    message: `Your ${session.role} role is not allowed to perform this action.`
+  });
   return null;
 }
 
@@ -526,7 +585,8 @@ async function openOperatorSession(client, { userName, shift, handoverNotes = nu
     status: "active",
     signedIn: true,
     businessDateId: businessDate.id,
-    businessDate: businessDate.businessDate
+    businessDate: businessDate.businessDate,
+    permissions: permissionsForRole(user.role)
   };
 }
 
@@ -578,7 +638,17 @@ async function handleSessionRoute(req, res, requestPath) {
     const client = await pool.connect();
     try {
       await client.query("begin");
+      const activeSession = await requireActiveSession(req, res, client);
+      if (!activeSession) {
+        await client.query("rollback");
+        return true;
+      }
       const sessionId = body.sessionId || getRequestSessionId(req);
+      if (sessionId !== activeSession.sessionId) {
+        await client.query("rollback");
+        sendJson(res, 403, { ok: false, code: "FORBIDDEN", message: "You can only close your own active session." });
+        return true;
+      }
       const session = await closeOperatorSession(client, sessionId);
       await logAudit(client, "operator_logout", "shift_session", session.sessionId, `${session.user} signed out`, session);
       await client.query("commit");
@@ -596,6 +666,16 @@ async function handleSessionRoute(req, res, requestPath) {
     const client = await pool.connect();
     try {
       await client.query("begin");
+      const activeSession = await requireActiveSession(req, res, client);
+      if (!activeSession) {
+        await client.query("rollback");
+        return true;
+      }
+      if (body.sessionId !== activeSession.sessionId) {
+        await client.query("rollback");
+        sendJson(res, 403, { ok: false, code: "FORBIDDEN", message: "You can only hand over your own active session." });
+        return true;
+      }
       const outgoing = await closeOperatorSession(client, body.sessionId, body.notes || null);
       const incoming = await openOperatorSession(client, {
         userName: body.incomingUser,
@@ -627,7 +707,7 @@ async function handleMutation(req, res, requestPath) {
     }
 
     try {
-      const session = await requireActiveSession(req, res);
+      const session = await requirePermission(req, res, "demo.reset");
       if (!session) return true;
       await resetDemoData();
       const resetSession = await openOperatorSession(pool, { userName: session.user, shift: session.shift });
@@ -643,7 +723,7 @@ async function handleMutation(req, res, requestPath) {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      const session = await requireActiveSession(req, res, client);
+      const session = await requirePermission(req, res, "reservation.create", client);
       if (!session) {
         await client.query("rollback");
         return true;
@@ -698,7 +778,7 @@ async function handleMutation(req, res, requestPath) {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      const session = await requireActiveSession(req, res, client);
+      const session = await requirePermission(req, res, "room.assign", client);
       if (!session) {
         await client.query("rollback");
         return true;
@@ -736,7 +816,7 @@ async function handleMutation(req, res, requestPath) {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      const session = await requireActiveSession(req, res, client);
+      const session = await requirePermission(req, res, "guest.check_in", client);
       if (!session) {
         await client.query("rollback");
         return true;
@@ -789,20 +869,53 @@ async function handleMutation(req, res, requestPath) {
 
   const roomMatch = requestPath.match(/^\/api\/rooms\/([^/]+)$/);
   if (req.method === "PATCH" && roomMatch) {
+    const roomNumber = decodeURIComponent(roomMatch[1]);
     const session = await requireActiveSession(req, res);
     if (!session) return true;
+    const currentRoom = await pool.query(
+      "select housekeeping_status, maintenance_status from rooms where room_number = $1",
+      [roomNumber]
+    );
+    if (!currentRoom.rows[0]) {
+      sendJson(res, 404, { ok: false, message: "Room not found." });
+      return true;
+    }
+    const housekeepingChanged = body.housekeeping !== currentRoom.rows[0].housekeeping_status;
+    const maintenanceChanged = toDbMaintenanceStatus(body.maintenance) !== currentRoom.rows[0].maintenance_status;
+    if (housekeepingChanged && !hasPermission(session, "room.housekeeping.update")) {
+      sendJson(res, 403, {
+        ok: false,
+        code: "FORBIDDEN",
+        permission: "room.housekeeping.update",
+        message: `Your ${session.role} role cannot update housekeeping status.`
+      });
+      return true;
+    }
+    if (maintenanceChanged && !hasPermission(session, "room.maintenance.update")) {
+      sendJson(res, 403, {
+        ok: false,
+        code: "FORBIDDEN",
+        permission: "room.maintenance.update",
+        message: `Your ${session.role} role cannot update maintenance status.`
+      });
+      return true;
+    }
+    if (!housekeepingChanged && !maintenanceChanged) {
+      sendJson(res, 200, { ok: true, state: await fetchAppState() });
+      return true;
+    }
     await pool.query(
       "update rooms set housekeeping_status = $1, maintenance_status = $2 where room_number = $3",
-      [body.housekeeping, toDbMaintenanceStatus(body.maintenance), decodeURIComponent(roomMatch[1])]
+      [body.housekeeping, toDbMaintenanceStatus(body.maintenance), roomNumber]
     );
-    await logAudit(pool, "room_status", "room", decodeURIComponent(roomMatch[1]), `Room ${decodeURIComponent(roomMatch[1])} status updated`, session);
+    await logAudit(pool, "room_status", "room", roomNumber, `Room ${roomNumber} status updated`, session);
     sendJson(res, 200, { ok: true, state: await fetchAppState() });
     return true;
   }
 
   const serviceMatch = requestPath.match(/^\/api\/stays\/(\d+)\/service-charge$/);
   if (req.method === "POST" && serviceMatch) {
-    const session = await requireActiveSession(req, res);
+    const session = await requirePermission(req, res, "service_charge.post");
     if (!session) return true;
     const stayId = Number(serviceMatch[1]);
     const category = await pool.query("select id from service_categories where name = $1", [body.category]);
@@ -825,7 +938,7 @@ async function handleMutation(req, res, requestPath) {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      const session = await requireActiveSession(req, res, client);
+      const session = await requirePermission(req, res, "payment.post", client);
       if (!session) {
         await client.query("rollback");
         return true;
@@ -867,7 +980,7 @@ async function handleMutation(req, res, requestPath) {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      const session = await requireActiveSession(req, res, client);
+      const session = await requirePermission(req, res, "guest.check_out", client);
       if (!session) {
         await client.query("rollback");
         return true;

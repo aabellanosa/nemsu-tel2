@@ -239,7 +239,7 @@ npm run db:seed
 
 - User login is server-backed but still demo-grade; it does not use passwords, OAuth, MFA, or production user administration.
 - Duplicate login blocking exists, but there is no supervisor override or forced stale-session release yet.
-- Backend write routes require an active session, but the full role permission matrix is not fully enforced yet.
+- Backend write routes require an active session and enforce named permissions for the documented role matrix.
 - Audit events now receive session context for core write routes, but audit detail still needs hardening for production use.
 - Other browsers do not update automatically until refresh.
 - Conflict handling is basic.

@@ -10,6 +10,13 @@ const roleAccess = {
   "Housekeeping Supervisor": ["housekeeping", "rooms"],
   "Night Auditor": ["dashboard", "departures", "cashiering", "services", "reports"]
 };
+const rolePermissions = {
+  "Front Desk Agent": ["reservation.create", "room.assign", "guest.check_in", "service_charge.post", "guest.check_out"],
+  "Front Desk Supervisor": ["reservation.create", "room.assign", "guest.check_in", "room.housekeeping.update", "room.maintenance.update", "service_charge.post", "payment.post", "guest.check_out", "report.view", "demo.reset"],
+  Cashier: ["service_charge.post", "payment.post", "guest.check_out"],
+  "Housekeeping Supervisor": ["room.housekeeping.update"],
+  "Night Auditor": ["service_charge.post", "payment.post", "guest.check_out", "report.view", "demo.reset"]
+};
 const viewLabels = {
   dashboard: "Today's Front Desk Overview",
   reservations: "Reservations Management",
@@ -156,7 +163,7 @@ function maskCard(number) {
 }
 
 const state = {
-  session: { user: "", role: "", shift: "", signedIn: false, sessionId: null, userId: null },
+  session: { user: "", role: "", shift: "", signedIn: false, sessionId: null, userId: null, permissions: [] },
   activeView: "dashboard",
   arrivalFilter: "all",
   activeRoom: null,
@@ -300,7 +307,7 @@ function applyRemoteState(remoteState) {
 
 function applySession(session) {
   if (!session) {
-    state.session = { user: "", role: "", shift: "", signedIn: false, sessionId: null, userId: null };
+    state.session = { user: "", role: "", shift: "", signedIn: false, sessionId: null, userId: null, permissions: [] };
     return;
   }
   state.session = {
@@ -310,7 +317,8 @@ function applySession(session) {
     signedIn: session.signedIn !== false,
     sessionId: session.sessionId || null,
     userId: session.userId || null,
-    username: session.username || ""
+    username: session.username || "",
+    permissions: Array.isArray(session.permissions) ? session.permissions : (rolePermissions[session.role] || [])
   };
 }
 
@@ -353,7 +361,8 @@ function loadWorkstationState() {
         signedIn: saved.session.signedIn !== false,
         sessionId: saved.session.sessionId || null,
         userId: saved.session.userId || null,
-        username: saved.session.username || ""
+        username: saved.session.username || "",
+        permissions: Array.isArray(saved.session.permissions) ? saved.session.permissions : (rolePermissions[saved.session.role] || [])
       };
     }
     if (saved.activeView && viewLabels[saved.activeView]) {
@@ -435,16 +444,20 @@ function permitted(view) {
   return (roleAccess[state.session.role] || []).includes(view);
 }
 
+function hasPermission(permission) {
+  return (state.session.permissions || []).includes(permission);
+}
+
 function hasFrontDeskAccess() {
-  return permitted("reservations");
+  return hasPermission("reservation.create");
 }
 
 function canUpdateHousekeeping() {
-  return ["Front Desk Supervisor", "Housekeeping Supervisor"].includes(state.session.role);
+  return hasPermission("room.housekeeping.update");
 }
 
 function canUpdateMaintenance() {
-  return state.session.role === "Front Desk Supervisor";
+  return hasPermission("room.maintenance.update");
 }
 
 function canCashier() {
@@ -452,11 +465,11 @@ function canCashier() {
 }
 
 function canPostPayments() {
-  return canCashier();
+  return hasPermission("payment.post");
 }
 
 function canPostServices() {
-  return permitted("services") || canCashier();
+  return hasPermission("service_charge.post");
 }
 
 function roomRackClass(room) {
@@ -1564,12 +1577,12 @@ elements.moduleWorkspace.addEventListener("click", (event) => {
     notify(`Check-out completed. Room ${stay.room} is vacant dirty.`);
   }
   if (event.target.dataset.report) {
-    if (!permitted("reports")) return notify("Reporting access is required.");
+    if (!hasPermission("report.view")) return notify("Reporting access is required.");
     printReport(event.target.dataset.report);
     notify(`${event.target.dataset.report} opened for printing.`);
   }
   if (event.target.dataset.resetDemo) {
-    if (!permitted("reports")) return notify("Reporting access is required.");
+    if (!hasPermission("demo.reset")) return notify("Demo reset permission is required.");
     if (!state.apiConnected) return notify("Demo reset requires the shared database connection.");
     if (!window.confirm("Reset all practicum demo data to the initial arrivals, rooms, in-house guests, and folios?")) return;
     event.target.disabled = true;
@@ -1643,7 +1656,7 @@ document.querySelector("#handoverForm").addEventListener("submit", (event) => {
     return;
   }
   state.handovers.unshift({ outgoing, incoming: { user, role, shift: values.get("incomingShift") }, notes: values.get("notes") });
-  state.session = { user, role, shift: values.get("incomingShift"), signedIn: true };
+  state.session = { user, role, shift: values.get("incomingShift"), signedIn: true, permissions: rolePermissions[role] || [] };
   addActivity("Shift handover completed", `${outgoing.user} transferred duty to ${user}.`, `${outgoing.user} | ${outgoing.shift}`);
   closeModal(elements.handoverModal);
   event.target.reset();
@@ -1697,7 +1710,7 @@ document.querySelector("#loginForm").addEventListener("submit", async (event) =>
     }
     return;
   }
-  state.session = { user, role, shift: values.get("loginShift"), signedIn: true };
+  state.session = { user, role, shift: values.get("loginShift"), signedIn: true, permissions: rolePermissions[role] || [] };
   addActivity("Operator signed in", `${user} opened the ${state.session.shift} workspace.`);
   closeModal(elements.loginModal);
   renderSession();
