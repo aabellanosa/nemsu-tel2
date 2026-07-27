@@ -134,7 +134,16 @@ function sendFile(res, filePath) {
       return;
     }
 
-    res.writeHead(200, { "Content-Type": contentTypes[path.extname(filePath)] || "application/octet-stream" });
+    const extension = path.extname(filePath);
+    const headers = {
+      "Content-Type": contentTypes[extension] || "application/octet-stream"
+    };
+    if ([".html", ".js", ".css"].includes(extension)) {
+      headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+      headers.Pragma = "no-cache";
+      headers.Expires = "0";
+    }
+    res.writeHead(200, headers);
     res.end(data);
   });
 }
