@@ -184,6 +184,10 @@ const state = {
   session: { user: "", role: "", shift: "", signedIn: false, sessionId: null, userId: null, permissions: [] },
   activeView: "dashboard",
   arrivalFilter: "all",
+  roomBoardGroup: "operational",
+  roomBoardFloor: "all",
+  roomBoardType: "all",
+  roomBoardSearch: "",
   activeRoom: null,
   activeReservationId: null,
   activePaymentStayId: null,
@@ -380,7 +384,11 @@ async function persistMutation(path, options, fallback) {
   }
   applyRemoteState(payload.state);
   if (payload.session) applySession(payload.session);
-  renderSession();
+  if (state.activeView === "rooms" && typeof document.startViewTransition === "function") {
+    document.startViewTransition(() => renderSession());
+  } else {
+    renderSession();
+  }
   return true;
 }
 
@@ -623,8 +631,8 @@ function renderActivity() {
   `).join("");
 }
 
-function moduleStats(cards) {
-  return `<div class="module-cards">${cards.map((card) => `<article class="panel module-stat"><p>${card.label}</p><strong>${card.value}</strong></article>`).join("")}</div>`;
+function moduleStats(cards, className = "") {
+  return `<div class="module-cards ${className}">${cards.map((card) => `<article class="panel module-stat"><p>${card.label}</p><strong>${card.value}</strong></article>`).join("")}</div>`;
 }
 
 function renderReservationsWorkspace() {
@@ -653,19 +661,111 @@ function renderReservationsWorkspace() {
     </article>`;
 }
 
+const roomBoardGroups = {
+  operational: {
+    label: "Operational Readiness",
+    columns: [
+      { key: "ready", label: "Ready", detail: "Vacant and ready to assign" },
+      { key: "assigned", label: "Assigned", detail: "Reserved for an arrival" },
+      { key: "occupied", label: "Occupied", detail: "Currently in house" },
+      { key: "needs-service", label: "Needs Service", detail: "Dirty or pickup required" },
+      { key: "unavailable", label: "Unavailable", detail: "Out of service or order" }
+    ],
+    status(room) {
+      if (room.maintenance !== "inService") return "unavailable";
+      if (room.occupancy === "occupied") return "occupied";
+      if (room.occupancy === "assigned") return "assigned";
+      if (["dirty", "pickup"].includes(room.housekeeping)) return "needs-service";
+      return "ready";
+    }
+  },
+  frontOffice: {
+    label: "Front Office Status",
+    columns: [
+      { key: "vacant", label: "Vacant", detail: "No assigned guest" },
+      { key: "assigned", label: "Assigned", detail: "Reserved for an arrival" },
+      { key: "occupied", label: "Occupied", detail: "Currently in house" }
+    ],
+    status: (room) => room.occupancy
+  },
+  housekeeping: {
+    label: "Housekeeping Status",
+    columns: [
+      { key: "dirty", label: "Dirty", detail: "Cleaning required" },
+      { key: "pickup", label: "Pickup", detail: "Touch-up or recheck" },
+      { key: "clean", label: "Clean", detail: "Cleaned for use" },
+      { key: "inspected", label: "Inspected", detail: "Certified ready" }
+    ],
+    status: (room) => room.housekeeping
+  },
+  maintenance: {
+    label: "Maintenance Status",
+    columns: [
+      { key: "inService", label: "In Service", detail: "Operational inventory" },
+      { key: "outOfService", label: "Out of Service", detail: "Temporarily unavailable" },
+      { key: "outOfOrder", label: "Out of Order", detail: "Blocked for repair" }
+    ],
+    status: (room) => room.maintenance
+  }
+};
+
+function roomFloor(room) {
+  return String(room.number).charAt(0);
+}
+
+function filteredRoomBoardRooms() {
+  const query = state.roomBoardSearch.trim().toLowerCase();
+  return state.rooms.filter((room) => {
+    const floorMatches = state.roomBoardFloor === "all" || roomFloor(room) === state.roomBoardFloor;
+    const typeMatches = state.roomBoardType === "all" || room.type === state.roomBoardType;
+    const searchMatches = !query || `${room.number} ${room.guest || ""} ${room.type} ${roomCodeLabels[room.type] || ""}`.toLowerCase().includes(query);
+    return floorMatches && typeMatches && searchMatches;
+  });
+}
+
+function roomBoardCard(room) {
+  return `<button class="room-board-card" type="button" data-open-room="${room.number}" style="view-transition-name: room-card-${room.number}">
+    <span class="room-card-heading"><strong>Room ${room.number}</strong><small>${roomCodeLabels[room.type] || room.type}</small></span>
+    ${room.guest ? `<span class="room-card-guest">${escapeHtml(room.guest)}</span>` : '<span class="room-card-guest muted">No assigned guest</span>'}
+    <span class="room-card-states">${statusPills(room)}</span>
+    <span class="room-card-action">${canUpdateHousekeeping() || canUpdateMaintenance() ? "Review / Update" : "View room"} →</span>
+  </button>`;
+}
+
 function renderRoomsWorkspace() {
+  const group = roomBoardGroups[state.roomBoardGroup] || roomBoardGroups.operational;
+  const rooms = filteredRoomBoardRooms();
+  const floors = [...new Set(state.rooms.map(roomFloor))].sort();
+  const types = [...new Set(state.rooms.map((room) => room.type))].sort();
   elements.moduleWorkspace.innerHTML = `
-    <article class="panel module-banner"><div><p class="eyebrow">Inventory Control</p><h3>Room Rack and Availability</h3></div><p>Front-office, housekeeping, and maintenance states are tracked separately.</p></article>
+    <article class="panel module-banner"><div><p class="eyebrow">Inventory Control</p><h3>Room Status Board</h3></div><p>Rooms are grouped by live operational status. Select a card to review its full state.</p></article>
     ${moduleStats([
+      { label: "Total Rooms", value: state.rooms.length },
       { label: "Ready Vacant", value: state.rooms.filter(roomIsAssignable).length },
       { label: "Occupied", value: state.rooms.filter((room) => room.occupancy === "occupied").length },
-      { label: "Assigned", value: state.rooms.filter((room) => room.occupancy === "assigned").length }
-    ])}
-    <article class="panel workspace-panel"><div class="panel-heading"><div><p class="eyebrow">Room Inventory</p><h3>All Floors</h3></div></div>
-      <div class="status-board">${state.rooms.map((room) => `
-        <div class="status-row"><div><strong>Room ${room.number}</strong><p>${room.type}${room.guest ? ` | ${room.guest}` : ""}</p></div>
-        <div class="status-row-actions">${statusPills(room)}<button class="row-action" data-open-room="${room.number}">${canUpdateHousekeeping() ? "Update" : "View"}</button></div></div>`).join("")}</div>
+      { label: "Needs Service", value: state.rooms.filter((room) => ["dirty", "pickup"].includes(room.housekeeping)).length }
+    ], "room-board-metrics")}
+    <article class="panel workspace-panel room-board-panel">
+      <div class="panel-heading room-board-heading"><div><p class="eyebrow">Live Inventory</p><h3>${group.label}</h3></div><span class="room-board-result">${rooms.length} of ${state.rooms.length} rooms</span></div>
+      <div class="room-board-toolbar" aria-label="Room board filters">
+        <label>Group by<select data-room-board-filter="group"><option value="operational">Operational Readiness</option><option value="frontOffice">Front Office</option><option value="housekeeping">Housekeeping</option><option value="maintenance">Maintenance</option></select></label>
+        <label>Floor<select data-room-board-filter="floor"><option value="all">All floors</option>${floors.map((floor) => `<option value="${floor}">Floor ${floor}</option>`).join("")}</select></label>
+        <label>Room type<select data-room-board-filter="type"><option value="all">All room types</option>${types.map((type) => `<option value="${type}">${roomCodeLabels[type] || type}</option>`).join("")}</select></label>
+        <label class="room-board-search">Find a room or guest<input data-room-board-filter="search" type="search" value="${escapeHtml(state.roomBoardSearch)}" placeholder="Room number or guest"></label>
+      </div>
+      <div class="room-board" style="--room-board-columns:${group.columns.length}">
+        ${group.columns.map((column) => {
+          const columnRooms = rooms.filter((room) => group.status(room) === column.key);
+          return `<section class="room-board-column status-${column.key}" aria-labelledby="room-column-${column.key}">
+            <header><div><h4 id="room-column-${column.key}">${column.label}</h4><p>${column.detail}</p></div><strong>${columnRooms.length}</strong></header>
+            <div class="room-board-lane">${columnRooms.map(roomBoardCard).join("") || '<p class="room-board-empty">No rooms in this status</p>'}</div>
+          </section>`;
+        }).join("")}
+      </div>
     </article>`;
+  elements.moduleWorkspace.querySelector('[data-room-board-filter="group"]').value = state.roomBoardGroup;
+  elements.moduleWorkspace.querySelector('[data-room-board-filter="floor"]').value = state.roomBoardFloor;
+  elements.moduleWorkspace.querySelector('[data-room-board-filter="type"]').value = state.roomBoardType;
 }
 
 function renderHousekeepingWorkspace() {
@@ -1642,7 +1742,11 @@ document.querySelector("#roomForm").addEventListener("submit", async (event) => 
   room.maintenance = maintenance;
   addActivity(`Room ${room.number} status updated`, `${housekeepingLabels[room.housekeeping]} / ${maintenanceLabels[room.maintenance]}`);
   closeModal(elements.roomModal);
-  renderAll();
+  if (state.activeView === "rooms" && typeof document.startViewTransition === "function") {
+    document.startViewTransition(() => renderAll());
+  } else {
+    renderAll();
+  }
   notify(`Operations status updated for room ${room.number}.`);
 });
 
@@ -1665,7 +1769,8 @@ elements.moduleWorkspace.addEventListener("click", (event) => {
   if (event.target.dataset.serviceStay) openPostCharge(event.target.dataset.serviceStay);
   if (event.target.dataset.reservationDetail) openReservationDetail(event.target.dataset.reservationDetail);
   if (event.target.dataset.moduleArrival) beginArrivalAction(event.target.dataset.moduleArrival);
-  if (event.target.dataset.openRoom) openRoom(event.target.dataset.openRoom);
+  const roomCard = event.target.closest("[data-open-room]");
+  if (roomCard) openRoom(roomCard.dataset.openRoom);
   if (event.target.dataset.cleanRoom) {
     if (!canUpdateHousekeeping()) return notify("Housekeeping update permission is required.");
     const room = state.rooms.find((item) => item.number === event.target.dataset.cleanRoom);
@@ -1722,6 +1827,24 @@ elements.moduleWorkspace.addEventListener("click", (event) => {
         event.target.disabled = false;
       });
   }
+});
+
+elements.moduleWorkspace.addEventListener("change", (event) => {
+  const filter = event.target.dataset.roomBoardFilter;
+  if (!filter || filter === "search") return;
+  if (filter === "group") state.roomBoardGroup = event.target.value;
+  if (filter === "floor") state.roomBoardFloor = event.target.value;
+  if (filter === "type") state.roomBoardType = event.target.value;
+  renderRoomsWorkspace();
+});
+
+elements.moduleWorkspace.addEventListener("input", (event) => {
+  if (event.target.dataset.roomBoardFilter !== "search") return;
+  state.roomBoardSearch = event.target.value;
+  renderRoomsWorkspace();
+  const search = elements.moduleWorkspace.querySelector('[data-room-board-filter="search"]');
+  search.focus();
+  search.setSelectionRange(search.value.length, search.value.length);
 });
 
 document.querySelector("#globalSearch").addEventListener("input", (event) => {

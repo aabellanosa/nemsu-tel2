@@ -34,7 +34,7 @@
 | --- | --- |
 | Front Desk | Daily overview of occupancy, arrivals, departures, in-house guests, room issues, room rack, and shift activity. |
 | Reservations | Capture reservation details, view active reservations, assign rooms, and initiate check-in. |
-| Room Rack | View room inventory and separate occupancy, housekeeping, and maintenance conditions. |
+| Room Rack | View rooms in live status columns, with grouping for operational readiness, occupancy, housekeeping, and maintenance conditions. |
 | Departures | Review in-house stays due for departure and complete check-out after folio settlement. |
 | Services | Post add-on hotel service charges to active guest folios. |
 | Housekeeping | Review room service queue and update housekeeping readiness. |
