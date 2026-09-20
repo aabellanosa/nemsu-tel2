@@ -158,9 +158,26 @@ button {
   font-weight: 600;
 }
 
+a.header-button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.help-header-button {
+  color: var(--gold-light);
+}
+
 .header-button.subtle {
   border-color: #314c63;
   color: #c2d1dc;
+}
+
+.help-login-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
 
 .icon-button {
@@ -190,6 +207,15 @@ button {
 .drawer-close,
 .sidebar-overlay {
   display: none;
+}
+
+a.nav-item {
+  text-decoration: none;
+}
+
+.help-nav-item {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .nav-item {

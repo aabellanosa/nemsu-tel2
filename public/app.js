@@ -732,9 +732,9 @@ function renderSession() {
   document.querySelector("#activeRole").textContent = state.session.signedIn ? state.session.role : "No active role";
   document.querySelector("#activeShift").textContent = state.session.signedIn ? state.session.shift : "No Active Shift";
   const allowedViews = roleAccess[state.session.role] || [];
-  document.querySelectorAll(".nav-item").forEach((button) => button.classList.toggle("hidden", !allowedViews.includes(button.dataset.view)));
+  document.querySelectorAll("#navigation .nav-item").forEach((button) => button.classList.toggle("hidden", !allowedViews.includes(button.dataset.view)));
   if (!allowedViews.includes(state.activeView)) state.activeView = allowedViews[0] || "dashboard";
-  document.querySelectorAll(".nav-item").forEach((button) => button.classList.toggle("active", button.dataset.view === state.activeView));
+  document.querySelectorAll("#navigation .nav-item").forEach((button) => button.classList.toggle("active", button.dataset.view === state.activeView));
   document.querySelector("#viewTitle").textContent = viewLabels[state.activeView];
   const dashboard = state.activeView === "dashboard";
   elements.dashboardWorkspace.classList.toggle("hidden", !dashboard);

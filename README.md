@@ -4,6 +4,7 @@ A Micros-Fidelio-inspired hotel property management UI prototype built with a No
 
 ## Functional Documentation
 
+- [Student Online Help](public/help.html) provides a searchable, mobile-friendly OJT guide that is published with the application and linked from its sidebar.
 - [User Access and UI Flow](docs/USER_ACCESS_AND_UI_FLOW.md) defines roles, allowed tabs, operational permissions, reservation/check-in/cashiering/departure flow, shift handover, and the planned persistence boundary.
 - [Current Build State](docs/CURRENT_BUILD_STATE.md) summarizes the present Render/PostgreSQL build, local setup, API surface, demo reset, limitations, and next build series.
 - [Static Deployment to Namecheap](docs/DEPLOYMENT.md) explains the GitHub Actions deployment flow and required repository secrets.
