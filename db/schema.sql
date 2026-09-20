@@ -68,6 +68,20 @@ create table if not exists room_status_history (
   created_at timestamptz not null default now()
 );
 
+-- Additive inventory expansion. Existing rooms and their live statuses are preserved.
+insert into rooms (room_number, room_type, occupancy_status, housekeeping_status, maintenance_status) values
+  ('206', 'DLX', 'vacant', 'clean', 'in_service'),
+  ('207', 'STD', 'vacant', 'clean', 'in_service'),
+  ('208', 'DLX', 'vacant', 'clean', 'in_service'),
+  ('209', 'STD', 'vacant', 'clean', 'in_service'),
+  ('210', 'STE', 'vacant', 'clean', 'in_service'),
+  ('306', 'DLX', 'vacant', 'clean', 'in_service'),
+  ('307', 'STD', 'vacant', 'clean', 'in_service'),
+  ('308', 'DLX', 'vacant', 'clean', 'in_service'),
+  ('309', 'STD', 'vacant', 'clean', 'in_service'),
+  ('310', 'STE', 'vacant', 'clean', 'in_service')
+on conflict (room_number) do nothing;
+
 create table if not exists guest_profiles (
   id bigserial primary key,
   first_name text not null,

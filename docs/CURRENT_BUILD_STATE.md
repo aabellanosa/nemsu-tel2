@@ -26,6 +26,7 @@
 - Deployment:
   - Render web service runs the Node app.
   - Render PostgreSQL stores shared PMS state.
+  - The baseline inventory contains 25 rooms across floors 2, 3, and 4.
   - Namecheap static hosting is now legacy for the earlier non-persistent prototype.
 
 ## Important Files
