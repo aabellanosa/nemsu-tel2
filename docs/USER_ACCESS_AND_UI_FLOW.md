@@ -453,6 +453,8 @@
 - When PostgreSQL is configured, sign-in creates an active server-side `shift_sessions` record.
 - The browser remembers the active session identifier locally and validates it after refresh.
 - Operational activity records are labeled with the user, role, shift, business date, and session performing the action where the current API supports it.
+- Active sessions expire after 30 minutes without browser or operational activity by default. The deployment may change this through `SESSION_IDLE_TIMEOUT_MINUTES`.
+- Browser activity sends a throttled heartbeat to renew the server-side session. Expired sessions are closed automatically and no longer block a fresh sign-in for that operator.
 
 ### Change Shift / Handover
 

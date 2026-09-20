@@ -283,6 +283,10 @@ const elements = {
 };
 
 const workstationStateKey = "hmsystem.workstation";
+let idleTimeoutMs = 30 * 60 * 1000;
+let lastUserActivityAt = Date.now();
+let lastHeartbeatAt = 0;
+const heartbeatThrottleMs = 60 * 1000;
 
 async function apiRequest(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
@@ -320,6 +324,8 @@ function applySession(session) {
     username: session.username || "",
     permissions: Array.isArray(session.permissions) ? session.permissions : (rolePermissions[session.role] || [])
   };
+  if (Number(session.idleTimeoutMinutes) > 0) idleTimeoutMs = Number(session.idleTimeoutMinutes) * 60 * 1000;
+  lastUserActivityAt = Date.now();
 }
 
 async function refreshRemoteState() {
@@ -387,6 +393,47 @@ function saveWorkstationState() {
 function clearWorkstationState() {
   localStorage.removeItem(workstationStateKey);
 }
+
+function showExpiredSession() {
+  if (!state.session.signedIn) return;
+  applySession(null);
+  clearWorkstationState();
+  renderSession();
+  openModal(elements.loginModal);
+  notify("Your session timed out due to inactivity. Please sign in again.");
+}
+
+async function sendActivityHeartbeat() {
+  if (!state.apiConnected || !state.session.signedIn || !state.session.sessionId) return;
+  const now = Date.now();
+  if (now - lastHeartbeatAt < heartbeatThrottleMs) return;
+  lastHeartbeatAt = now;
+  try {
+    const payload = await apiRequest("/api/session/heartbeat", { method: "POST", body: "{}" });
+    if (Number(payload.expiresAfterMinutes) > 0) idleTimeoutMs = Number(payload.expiresAfterMinutes) * 60 * 1000;
+  } catch (error) {
+    if (/session|sign in/i.test(error.message)) showExpiredSession();
+  }
+}
+
+function recordUserActivity() {
+  if (state.session.signedIn && Date.now() - lastUserActivityAt >= idleTimeoutMs) {
+    showExpiredSession();
+    return;
+  }
+  lastUserActivityAt = Date.now();
+  void sendActivityHeartbeat();
+}
+
+["pointerdown", "keydown", "touchstart", "scroll"].forEach((eventName) => {
+  document.addEventListener(eventName, recordUserActivity, { passive: true });
+});
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) recordUserActivity();
+});
+setInterval(() => {
+  if (state.session.signedIn && Date.now() - lastUserActivityAt >= idleTimeoutMs) showExpiredSession();
+}, 15 * 1000);
 
 function syncTopbarOffset() {
   const topbar = document.querySelector(".topbar");

@@ -36,6 +36,11 @@ create table if not exists shift_sessions (
   handover_notes text
 );
 
+alter table shift_sessions add column if not exists last_activity_at timestamptz;
+update shift_sessions set last_activity_at = started_at where last_activity_at is null;
+alter table shift_sessions alter column last_activity_at set default now();
+alter table shift_sessions alter column last_activity_at set not null;
+
 create table if not exists rooms (
   id bigserial primary key,
   room_number text not null unique,

@@ -212,6 +212,7 @@ npm run db:seed
 - The browser remembers only the current session/workstation identifier in `localStorage`.
 - Refresh validates the remembered session through the API before restoring the operator view.
 - PostgreSQL keeps `shift_sessions` for sign-in, sign-out, and handover.
+- Shift sessions track last activity and expire after 30 inactive minutes by default, releasing abandoned operator logins.
 - The database prevents one demo operator from having two active sessions at the same time.
 - Data changes persist in PostgreSQL and become visible to other browsers after refresh.
 - Automatic realtime updates are not implemented yet.

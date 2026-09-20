@@ -30,6 +30,8 @@ function getDatabaseSslConfig(connectionString) {
 
 const publicDir = path.join(__dirname, "public");
 const port = Number(process.env.PORT) || 3000;
+const configuredIdleTimeout = Number(process.env.SESSION_IDLE_TIMEOUT_MINUTES || 30);
+const sessionIdleTimeoutMinutes = Number.isFinite(configuredIdleTimeout) && configuredIdleTimeout > 0 ? configuredIdleTimeout : 30;
 const databaseUrl = process.env.DATABASE_URL;
 const pool = databaseUrl
   ? new Pool({
@@ -381,6 +383,13 @@ async function fetchActivity(client = pool) {
 
 async function fetchSession(sessionId, client = pool) {
   if (!sessionId) return null;
+  await client.query(`
+    update shift_sessions
+    set status = 'closed', ended_at = now(), handover_notes = coalesce(handover_notes, 'Automatically signed out after inactivity.')
+    where id = $1
+      and status = 'active'
+      and last_activity_at < now() - ($2 * interval '1 minute')
+  `, [sessionId, sessionIdleTimeoutMinutes]);
   const result = await client.query(`
     select
       shift_sessions.id as "sessionId",
@@ -390,6 +399,7 @@ async function fetchSession(sessionId, client = pool) {
       roles.name as role,
       shift_sessions.shift_name as shift,
       shift_sessions.status,
+      shift_sessions.last_activity_at as "lastActivityAt",
       business_dates.id as "businessDateId",
       business_dates.business_date as "businessDate"
     from shift_sessions
@@ -407,13 +417,17 @@ async function fetchSession(sessionId, client = pool) {
     businessDateId: toNumberOrNull(session.businessDateId),
     businessDate: formatDateOnly(session.businessDate),
     signedIn: session.status === "active",
+    idleTimeoutMinutes: sessionIdleTimeoutMinutes,
     permissions: permissionsForRole(session.role)
   };
 }
 
 async function requireActiveSession(req, res, client = pool) {
   const session = await fetchSession(getRequestSessionId(req), client);
-  if (session && session.signedIn) return session;
+  if (session && session.signedIn) {
+    await client.query("update shift_sessions set last_activity_at = now() where id = $1 and status = 'active'", [session.sessionId]);
+    return session;
+  }
   sendJson(res, 401, { ok: false, message: "Active operator session is required. Please sign in again." });
   return null;
 }
@@ -560,6 +574,14 @@ async function openOperatorSession(client, { userName, shift, handoverNotes = nu
   const user = userResult.rows[0];
   if (!user) throw new Error("Operator was not found or is inactive.");
 
+  await client.query(`
+    update shift_sessions
+    set status = 'closed', ended_at = now(), handover_notes = coalesce(handover_notes, 'Automatically signed out after inactivity.')
+    where user_id = $1
+      and status = 'active'
+      and last_activity_at < now() - ($2 * interval '1 minute')
+  `, [user.id, sessionIdleTimeoutMinutes]);
+
   const active = await client.query(
     "select id from shift_sessions where user_id = $1 and status = 'active' limit 1",
     [user.id]
@@ -586,6 +608,7 @@ async function openOperatorSession(client, { userName, shift, handoverNotes = nu
     signedIn: true,
     businessDateId: businessDate.id,
     businessDate: businessDate.businessDate,
+    idleTimeoutMinutes: sessionIdleTimeoutMinutes,
     permissions: permissionsForRole(user.role)
   };
 }
@@ -659,6 +682,13 @@ async function handleSessionRoute(req, res, requestPath) {
     } finally {
       client.release();
     }
+    return true;
+  }
+
+  if (requestPath === "/api/session/heartbeat") {
+    const session = await requireActiveSession(req, res);
+    if (!session) return true;
+    sendJson(res, 200, { ok: true, expiresAfterMinutes: sessionIdleTimeoutMinutes });
     return true;
   }
 

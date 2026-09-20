@@ -16,6 +16,7 @@ This branch migrates HMSystem from a static Namecheap prototype toward a shared 
 - `/api/session/login`, `/api/session/logout`, `/api/session/:id`, and `/api/session/handover` now manage demo operator sessions.
 - PostgreSQL `shift_sessions` are created and closed by sign-in, sign-out, and handover.
 - The database blocks two active sessions for the same demo operator.
+- Active sessions track their last activity and automatically expire after the configured idle timeout (30 minutes by default).
 
 ## Local Development
 
@@ -83,7 +84,7 @@ npm ci && npm run build:css
 Render start command:
 
 ```bash
-npm start
+npm run db:migrate && npm start
 ```
 
 ## Migration Phase Status
