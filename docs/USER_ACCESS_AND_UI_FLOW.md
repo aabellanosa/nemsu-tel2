@@ -209,10 +209,12 @@
   - Guest first name.
   - Guest last name.
   - Nationality.
+  - Residential address.
   - Guest ID type.
   - Guest ID number.
   - Arrival date.
   - Departure date.
+  - Number of nights, calculated automatically from the stay dates.
   - Requested room type.
   - Estimated arrival time.
   - Number of adults and children.
@@ -225,6 +227,9 @@
 - System generates:
   - Confirmation number.
   - Guest profile reference for the prototype record.
+- The Reservations workspace provides an A4 `Print Blank Form` action for walk-in guests who need a paper request.
+- Staff must enter the approved paper request through `New Reservation`; completing the paper form does not create a system reservation.
+- Never record a complete card number, CVV, password, or PIN on the form. Handle completed forms according to the property's privacy and records procedure.
 - Reservation classification:
   - Arrival on the active business date becomes `Due In`.
   - Arrival on a future date remains `Reserved`.

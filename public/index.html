@@ -161,7 +161,11 @@
           </div>
           <button class="close-button" type="button" data-close="reservationModal" aria-label="Close">&times;</button>
         </div>
-        <div class="form-grid">
+        <section class="reservation-form-section" aria-labelledby="guestInformationHeading">
+          <div class="reservation-section-heading">
+            <span>01</span><div><p class="eyebrow">Guest Profile</p><h3 id="guestInformationHeading">Guest Information</h3></div>
+          </div>
+          <div class="form-grid">
           <label>Guest first name<input name="guestFirstName" required placeholder="First name"></label>
           <label>Guest last name<input name="guestLastName" required placeholder="Last name"></label>
           <label>Nationality
@@ -185,36 +189,7 @@
               <option value="Other">🏳️ Other / Not listed</option>
             </select>
           </label>
-          <label>Arrival date<input name="arrivalDate" type="date" required></label>
-          <label>Departure date<input name="departureDate" type="date" required></label>
-          <label>Room type
-            <select name="roomType">
-              <option>Deluxe King</option>
-              <option>Deluxe Twin</option>
-              <option>Executive Suite</option>
-              <option>Standard Queen</option>
-            </select>
-          </label>
-          <label>ETA<input name="eta" type="time" value="14:00"></label>
-          <label>Adults<input name="adults" type="number" min="1" value="1" required></label>
-          <label>Children<input name="children" type="number" min="0" value="0" required></label>
-          <label>Rate plan
-            <select name="ratePlan">
-              <option value="BAR">Best Available Rate</option>
-              <option value="CORP">Corporate Rate</option>
-              <option value="GOV">Government Rate</option>
-              <option value="PKG">Package Rate</option>
-            </select>
-          </label>
-          <label>Nightly rate (PHP)<input name="nightlyRate" type="number" min="0" value="4250" required></label>
-          <label>Payment guarantee
-            <select name="paymentMethod">
-              <option>Credit Card Guarantee</option>
-              <option>Cash Deposit</option>
-              <option>Direct Bill</option>
-              <option>Pay at Hostel</option>
-            </select>
-          </label>
+          <label>Address<input name="address" autocomplete="street-address" placeholder="Residential address"></label>
           <label>Contact number<input name="phone" type="tel" placeholder="+63 9xx xxx xxxx"></label>
           <label>Email<input name="email" type="email" placeholder="guest@example.com"></label>
           <label>ID type
@@ -237,10 +212,45 @@
               <option value="true">VIP</option>
             </select>
           </label>
-        </div>
-        <label class="handover-notes">Reservation notes
-          <textarea name="notes" rows="2" placeholder="Preferences, arrival notes, special requests..."></textarea>
-        </label>
+          </div>
+        </section>
+        <section class="reservation-form-section" aria-labelledby="stayDetailsHeading">
+          <div class="reservation-section-heading">
+            <span>02</span><div><p class="eyebrow">Booking Details</p><h3 id="stayDetailsHeading">Stay and Room Details</h3></div>
+          </div>
+          <div class="form-grid">
+            <label>Arrival date<input name="arrivalDate" type="date" required></label>
+            <label>Departure date<input name="departureDate" type="date" required></label>
+            <label>Number of nights<input name="numberOfNights" type="number" min="1" value="1" readonly aria-live="polite"></label>
+            <label>ETA<input name="eta" type="time" value="14:00"></label>
+            <label>Adults<input name="adults" type="number" min="1" value="1" required></label>
+            <label>Children<input name="children" type="number" min="0" value="0" required></label>
+            <label>Room type
+              <select name="roomType">
+                <option>Deluxe King</option><option>Deluxe Twin</option><option>Executive Suite</option><option>Standard Queen</option>
+              </select>
+            </label>
+            <label>Rate plan
+              <select name="ratePlan">
+                <option value="BAR">Best Available Rate</option><option value="CORP">Corporate Rate</option><option value="GOV">Government Rate</option><option value="PKG">Package Rate</option>
+              </select>
+            </label>
+            <label>Nightly rate (PHP)<input name="nightlyRate" type="number" min="0" value="4250" required></label>
+            <label>Payment guarantee
+              <select name="paymentMethod">
+                <option>Credit Card Guarantee</option><option>Cash Deposit</option><option>Direct Bill</option><option>Pay at Hostel</option>
+              </select>
+            </label>
+          </div>
+        </section>
+        <section class="reservation-form-section" aria-labelledby="reservationNotesHeading">
+          <div class="reservation-section-heading">
+            <span>03</span><div><p class="eyebrow">Preferences</p><h3 id="reservationNotesHeading">Requests and Notes</h3></div>
+          </div>
+          <label class="handover-notes">Reservation notes
+            <textarea name="notes" rows="2" placeholder="Preferences, arrival notes, special requests..."></textarea>
+          </label>
+        </section>
         <div class="modal-actions">
           <button class="secondary-button" type="button" data-close="reservationModal">Cancel</button>
           <button class="primary-button" type="submit">Save Reservation</button>
@@ -538,6 +548,6 @@
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=20260920-session-timeout"></script>
+    <script src="app.js?v=20260920-reservation-sections"></script>
   </body>
 </html>

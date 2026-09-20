@@ -842,6 +842,54 @@ body.modal-fallback-active::before {
   background: white;
 }
 
+.form-grid input[readonly] {
+  color: var(--navy);
+  background: #f3f6f7;
+  font-weight: 700;
+}
+
+.reservation-form-section {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fbfcfc;
+}
+
+.reservation-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--line);
+}
+
+.reservation-section-heading > span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  border-radius: 50%;
+  color: white;
+  background: var(--navy);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.reservation-section-heading h3 {
+  margin: 3px 0 0;
+  color: var(--navy);
+  font-family: Georgia, serif;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.reservation-form-section .handover-notes {
+  margin-top: 0;
+}
+
 .handover-summary {
   margin-bottom: 20px;
   padding: 14px 16px;

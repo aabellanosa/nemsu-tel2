@@ -91,6 +91,24 @@ function nightsBetween(arrivalDate, departureDate) {
   return Math.max(1, Math.round((new Date(departureDate) - new Date(arrivalDate)) / 86400000));
 }
 
+function offsetDateFromKey(date, days) {
+  const value = new Date(`${date}T00:00:00`);
+  value.setDate(value.getDate() + days);
+  return formatDateKey(value);
+}
+
+function updateReservationNights() {
+  const form = document.querySelector("#reservationForm");
+  const arrival = form.elements.arrivalDate.value;
+  const departure = form.elements.departureDate.value;
+  form.elements.departureDate.min = arrival ? offsetDateFromKey(arrival, 1) : "";
+  if (!arrival || !departure || departure <= arrival) {
+    form.elements.numberOfNights.value = "";
+    return;
+  }
+  form.elements.numberOfNights.value = String(nightsBetween(arrival, departure));
+}
+
 function guestName(record) {
   return [record.guestFirstName, record.guestLastName].filter(Boolean).join(" ") || record.guest || "";
 }
@@ -610,7 +628,7 @@ function renderReservationsWorkspace() {
       { label: "Awaiting Room Today", value: dueToday.filter((item) => !item.room).length }
     ])}
     <article class="panel workspace-panel">
-      <div class="panel-heading"><div><p class="eyebrow">Reservations</p><h3>Arrival Detail</h3></div></div>
+      <div class="panel-heading"><div><p class="eyebrow">Reservations</p><h3>Arrival Detail</h3></div><button class="secondary-button" type="button" data-print-blank-reservation="true">Print Blank Form</button></div>
       <div class="workspace-table"><table>
         <thead><tr><th>Guest / Confirmation</th><th>Stay</th><th>Room Type / Room</th><th>Rate / Guarantee</th><th></th></tr></thead>
         <tbody>${reservations.map((reservation) => `
@@ -1142,7 +1160,23 @@ function openPrintDocument(title, subtitle, body) {
       td { border-bottom: 1px solid #dfe5e7; padding: 10px 7px; }
       .total { display: flex; justify-content: flex-end; gap: 40px; border-top: 2px solid #102a43; padding-top: 13px; font-size: 15px; font-weight: bold; }
       .footer { margin-top: 42px; border-top: 1px solid #dfe5e7; padding-top: 10px; color: #667682; font-size: 10px; }
-      @media print { body { margin: 14mm; } .no-print { display: none; } }
+      .paper-form { margin-top: 14px; }
+      .form-section { margin: 0 0 12px; border: 1px solid #9aa8b1; break-inside: avoid; }
+      .form-section h2 { margin: 0; padding: 5px 8px; color: #102a43; background: #edf1f3; font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; letter-spacing: .08em; text-transform: uppercase; }
+      .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
+      .form-field { min-height: 42px; padding: 5px 7px; border-top: 1px solid #cbd3d8; border-right: 1px solid #cbd3d8; }
+      .form-field:nth-child(4n) { border-right: 0; }
+      .form-field.half { grid-column: span 2; }
+      .form-field.full { grid-column: 1 / -1; border-right: 0; }
+      .form-field label { display: block; color: #52636f; font-size: 8px; font-weight: bold; letter-spacing: .04em; text-transform: uppercase; }
+      .write-line { min-height: 19px; margin-top: 5px; border-bottom: 1px solid #758692; }
+      .write-area { min-height: 48px; margin-top: 5px; border-bottom: 1px solid #758692; }
+      .choices { margin-top: 8px; word-spacing: 5px; }
+      .privacy-note { margin: 10px 0; padding: 7px 9px; border: 1px solid #b9852e; background: #fff9ed; font-size: 9px; }
+      .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 24px; }
+      .signature-line { padding-top: 4px; border-top: 1px solid #52636f; text-align: center; font-size: 9px; }
+      @page { size: A4 portrait; margin: 12mm; }
+      @media print { body { margin: 0; } .no-print { display: none; } }
     </style></head><body>
       <header class="header">
         <div><div class="hotel">Nemsu Tagbina Mini Hostel</div><p>Front Desk Console</p></div>
@@ -1155,6 +1189,37 @@ function openPrintDocument(title, subtitle, body) {
   printWindow.document.close();
   printWindow.focus();
   printWindow.setTimeout(() => printWindow.print(), 180);
+}
+
+function printBlankReservationForm() {
+  const blank = '<div class="write-line"></div>';
+  const field = (label, className = "") => `<div class="form-field ${className}"><label>${label}</label>${blank}</div>`;
+  const body = `<div class="paper-form">
+    <div class="form-section"><h2>Front Desk Use</h2><div class="form-grid">
+      ${field("Date received")}${field("Time received")}${field("Staff initials")}${field("Confirmation no.")}
+    </div></div>
+    <div class="form-section"><h2>Guest Information</h2><div class="form-grid">
+      ${field("First name", "half")}${field("Last name", "half")}
+      ${field("Nationality")}${field("ID type")}${field("ID number", "half")}
+      ${field("Residential address", "full")}${field("Mobile / telephone", "half")}${field("Email address", "half")}
+    </div></div>
+    <div class="form-section"><h2>Stay Details</h2><div class="form-grid">
+      ${field("Arrival date")}${field("Estimated arrival time")}${field("Departure date")}${field("Number of nights")}
+      ${field("Adults")}${field("Children")}${field("Requested room type", "half")}
+      ${field("Rate plan / quoted rate", "half")}
+      <div class="form-field half"><label>Guarantee / payment method</label><div class="choices">□ Cash &nbsp; □ Card &nbsp; □ Direct Bill &nbsp; □ Other</div></div>
+    </div></div>
+    <div class="form-section"><h2>Requests and Notes</h2><div class="form-grid"><div class="form-field full"><label>Special requests, accessibility needs, or other remarks</label><div class="write-area"></div></div></div></div>
+    <div class="privacy-note"><strong>Privacy and payment reminder:</strong> Do not write a complete card number, CVV, password, or PIN on this form. Present payment details directly to authorized staff when required.</div>
+    <p>I confirm that the information supplied above is accurate and understand that this request is subject to room availability and confirmation by the property.</p>
+    <div class="signature-grid"><div class="signature-line">Guest signature over printed name / Date</div><div class="signature-line">Received by / Date</div></div>
+    <div class="form-section" style="margin-top:20px"><h2>Internal Processing</h2><div class="form-grid">
+      ${field("Assigned room")}${field("Rate entered")}${field("Entered in system by")}${field("Date / Time")}
+    </div></div>
+  </div>`;
+  openPrintDocument("Blank Reservation Request Form", "For manual completion — staff must enter the approved request into the Front Desk Console.", body);
+  addActivity("Blank reservation form printed", "A4 walk-in reservation request form prepared.");
+  renderActivity();
 }
 
 function printReservation() {
@@ -1263,7 +1328,12 @@ elements.newReservationButton.addEventListener("click", () => {
   if (!hasFrontDeskAccess()) return notify("Reservation access is not assigned to this role.");
   document.querySelector('[name="arrivalDate"]').value = dateKey;
   document.querySelector('[name="departureDate"]').value = offsetDate(1);
+  updateReservationNights();
   openModal(elements.reservationModal);
+});
+
+document.querySelector("#reservationForm").addEventListener("input", (event) => {
+  if (["arrivalDate", "departureDate"].includes(event.target.name)) updateReservationNights();
 });
 
 document.querySelector("#reservationForm").addEventListener("submit", async (event) => {
@@ -1278,6 +1348,7 @@ document.querySelector("#reservationForm").addEventListener("submit", async (eve
     guestFirstName: values.get("guestFirstName").trim(),
     guestLastName: values.get("guestLastName").trim(),
     nationality: values.get("nationality"),
+    address: values.get("address").trim(),
     idType: values.get("idType"),
     idNumber: values.get("idNumber").trim(),
     arrivalDate: values.get("arrivalDate"),
@@ -1579,6 +1650,7 @@ elements.inHouseGuests.addEventListener("click", (event) => {
 });
 
 elements.moduleWorkspace.addEventListener("click", (event) => {
+  if (event.target.dataset.printBlankReservation) printBlankReservationForm();
   if (event.target.dataset.openServiceCharge) openPostCharge();
   if (event.target.dataset.serviceStay) openPostCharge(event.target.dataset.serviceStay);
   if (event.target.dataset.reservationDetail) openReservationDetail(event.target.dataset.reservationDetail);

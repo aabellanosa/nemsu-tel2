@@ -226,6 +226,7 @@ async function fetchReservations(client = pool) {
       guest_profiles.first_name as "guestFirstName",
       guest_profiles.last_name as "guestLastName",
       guest_profiles.nationality,
+      guest_profiles.address,
       guest_identifications.id_type as "idType",
       guest_identifications.id_number as "idNumber",
       guest_profiles.phone,
@@ -759,10 +760,10 @@ async function handleMutation(req, res, requestPath) {
         return true;
       }
       const guest = await client.query(
-        `insert into guest_profiles (first_name, last_name, nationality, phone, email, vip, notes)
-         values ($1, $2, $3, $4, $5, $6, $7)
+        `insert into guest_profiles (first_name, last_name, nationality, address, phone, email, vip, notes)
+         values ($1, $2, $3, $4, $5, $6, $7, $8)
          returning id`,
-        [body.guestFirstName, body.guestLastName, body.nationality, body.phone || null, body.email || null, Boolean(body.vip), body.notes || null]
+        [body.guestFirstName, body.guestLastName, body.nationality, body.address || null, body.phone || null, body.email || null, Boolean(body.vip), body.notes || null]
       );
       await client.query(
         "insert into guest_identifications (guest_profile_id, id_type, id_number) values ($1, $2, $3)",

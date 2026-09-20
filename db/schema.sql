@@ -81,6 +81,8 @@ create table if not exists guest_profiles (
   updated_at timestamptz not null default now()
 );
 
+alter table guest_profiles add column if not exists address text;
+
 create table if not exists guest_identifications (
   id bigserial primary key,
   guest_profile_id bigint not null references guest_profiles(id) on delete cascade,
